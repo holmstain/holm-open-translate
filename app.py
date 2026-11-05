@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="assets")
 
 API_KEY = os.getenv("NVIDIA_API_KEY")
 BASE_URL = "https://integrate.api.nvidia.com/v1"
@@ -75,6 +75,7 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#eef4ff">
     <title>Holm Translate</title>
+    <link rel="icon" type="image/png" href="{{ url_for('favicon', v=1) }}">
     <script>
         (() => {
             let theme;
@@ -165,16 +166,11 @@ HTML_TEMPLATE = """
             letter-spacing: -0.02em;
         }
 
-        .brand-mark {
-            display: grid;
-            width: 38px;
-            height: 38px;
-            place-items: center;
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.75);
-            border-radius: 13px;
-            background: linear-gradient(145deg, #5c8ff2, #2864db);
-            box-shadow: 0 7px 18px rgba(40, 100, 219, 0.23), inset 0 1px 0 rgba(255,255,255,.55);
+        .brand-logo {
+            width: 42px;
+            height: 46px;
+            flex: none;
+            object-fit: contain;
         }
 
         .privacy-pill {
@@ -647,7 +643,7 @@ HTML_TEMPLATE = """
     <main class="container app-shell">
         <header class="topbar">
             <div class="brand">
-                <span class="brand-mark" aria-hidden="true"><i class="fa-solid fa-language"></i></span>
+                <img class="brand-logo" src="{{ url_for('static', filename='holm-translate-logo.png') }}" alt="">
                 <span>Holm Translate</span>
             </div>
             <div class="topbar-controls">
@@ -963,6 +959,10 @@ HTML_TEMPLATE = """
 </body>
 </html>
 """
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_file(os.path.join(app.static_folder, 'favicon.ico'), mimetype='image/png')
 
 @app.route('/')
 def index():
