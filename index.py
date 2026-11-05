@@ -63,13 +63,13 @@ print(f"The source file has been read ({source_filename}), secure translation pr
 
 for code, lang_name in target_languages.items():
     output_filename = f"{code}.json"
-    print(f"-> {lang_name} ({output_filename}) çevriliyor...")
+    print(f"-> {lang_name} ({output_filename}) translating...")
     
     translated_data = translate_recursive(source_data, lang_name)
     
     with open(output_filename, "w", encoding="utf-8") as out_f:
         json.dump(translated_data, out_f, ensure_ascii=False, indent=2)
         
-    print(f"   [BAŞARILI] {output_filename} kaydedildi.")
+    print(f"   [SUCCESS] {output_filename} saved.")
 
-print("\nTüm çeviri işlemleri başarıyla tamamlandı!")
+print("\nAll translation processes completed successfully!")

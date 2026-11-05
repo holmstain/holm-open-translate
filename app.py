@@ -993,7 +993,7 @@ def translate():
     selected_langs = request.form.getlist('languages')
 
     if not uploaded_files or not selected_langs:
-        return "Lütfen en az bir dosya ve dil seçin!", 400
+        return "Please select at least one file and language!", 400
 
     memory_file = io.BytesIO()
 
@@ -1045,7 +1045,7 @@ def download_history(filename):
     if os.path.commonpath((user_dir, file_path)) == user_dir and os.path.isfile(file_path):
         return send_file(file_path, as_attachment=True)
     
-    return "Yetkisiz erişim veya dosya bulunamadı!", 403
+    return "Unauthorized access or file not found!", 403
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
