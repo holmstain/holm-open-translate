@@ -2,8 +2,7 @@ import os
 import json
 from openai import OpenAI
 
-# NVIDIA NIM API Bilgileri (Çalıştığı test edilen anahtarın)
-API_KEY = "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"
+API_KEY = os.getenv("NVIDIA_API_KEY")
 BASE_URL = "https://integrate.api.nvidia.com/v1"
 MODEL_NAME = "nvidia/riva-translate-4b-instruct-v2"
 
@@ -66,10 +65,8 @@ for code, lang_name in target_languages.items():
     output_filename = f"{code}.json"
     print(f"-> {lang_name} ({output_filename}) çevriliyor...")
     
-    # Veriyi çevir
     translated_data = translate_recursive(source_data, lang_name)
     
-    # Dosyaya kaydet
     with open(output_filename, "w", encoding="utf-8") as out_f:
         json.dump(translated_data, out_f, ensure_ascii=False, indent=2)
         
