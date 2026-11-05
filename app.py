@@ -32,9 +32,13 @@ TARGET_LANGUAGES = {
 
 def get_user_session_id():
     session_id = request.cookies.get("user_session")
-    if not session_id:
-        session_id = str(uuid.uuid4())
-    return session_id
+    try:
+        parsed_session_id = uuid.UUID(session_id)
+        if str(parsed_session_id) == session_id.lower():
+            return str(parsed_session_id)
+    except (AttributeError, TypeError, ValueError):
+        pass
+    return str(uuid.uuid4())
 
 def translate_text(text, lang_name):
     if not isinstance(text, str) or not text.strip():
@@ -672,7 +676,7 @@ HTML_TEMPLATE = """
 
         <section class="intro" aria-labelledby="page-title">
             <div class="eyebrow" data-i18n="eyebrow">JSON yerelleştirme</div>
-            <h1 id="page-title" data-i18n="headline">Dil bariyerlerini ortadan kaldırın.</h1>
+            <h1 id="page-title" data-i18n="headline">Uygulamanızda Dil bariyerlerini ortadan kaldırın.</h1>
             <p data-i18n="intro">JSON dosyalarınızı seçin, hedef dilleri belirleyin. Çeviri arşiviniz hazır olduğunda indirin.</p>
         </section>
 
@@ -764,7 +768,7 @@ HTML_TEMPLATE = """
                 pageTitle: "Holm Translate — JSON çeviri çalışma alanı",
                 interfaceLanguage: "Arayüz dili", themeDark: "Koyu temayı aç", themeLight: "Açık temayı aç",
                 privacy: "Kişisel çalışma alanı", eyebrow: "JSON yerelleştirme",
-                headline: "Dil bariyerlerini ortadan kaldırın.",
+                headline: "Uygulamanızda Dil bariyerlerini ortadan kaldırın.",
                 intro: "JSON dosyalarınızı seçin, hedef dilleri belirleyin. Çeviri arşiviniz hazır olduğunda indirin.",
                 newTranslation: "Yeni çeviri oluştur", startHint: "Başlamak için dosyalarınızı ve dilleri seçin.",
                 stepFiles: "JSON dosyalarını ekleyin", fileHint: "Bir veya daha fazla .json dosyası seçebilirsiniz.",
@@ -778,7 +782,7 @@ HTML_TEMPLATE = """
                 pageTitle: "Holm Translate — JSON translation workspace",
                 interfaceLanguage: "Interface language", themeDark: "Switch to dark mode", themeLight: "Switch to light mode",
                 privacy: "Private workspace", eyebrow: "JSON localization",
-                headline: "Break down language barriers.",
+                headline: "Break down language barriers in your app.",
                 intro: "Choose your JSON files and target languages. Download your translation archive when it is ready.",
                 newTranslation: "Create a translation", startHint: "Choose your files and languages to get started.",
                 stepFiles: "Add JSON files", fileHint: "You can select one or more .json files.",
@@ -792,7 +796,7 @@ HTML_TEMPLATE = """
                 pageTitle: "Holm Translate — JSON-Übersetzungsbereich",
                 interfaceLanguage: "Oberflächensprache", themeDark: "Dunkelmodus aktivieren", themeLight: "Hellmodus aktivieren",
                 privacy: "Privater Arbeitsbereich", eyebrow: "JSON-Lokalisierung",
-                headline: "Sprachbarrieren überwinden.",
+                headline: "Sprachbarrieren in Ihrer App überwinden.",
                 intro: "Wählen Sie Ihre JSON-Dateien und Zielsprachen aus. Laden Sie das Übersetzungsarchiv herunter, sobald es fertig ist.",
                 newTranslation: "Übersetzung erstellen", startHint: "Wählen Sie Dateien und Sprachen, um zu beginnen.",
                 stepFiles: "JSON-Dateien hinzufügen", fileHint: "Sie können eine oder mehrere .json-Dateien auswählen.",
@@ -806,7 +810,7 @@ HTML_TEMPLATE = """
                 pageTitle: "Holm Translate — espace de traduction JSON",
                 interfaceLanguage: "Langue de l’interface", themeDark: "Activer le thème sombre", themeLight: "Activer le thème clair",
                 privacy: "Espace de travail privé", eyebrow: "Localisation JSON",
-                headline: "Brisez les barrières linguistiques.",
+                headline: "Brisez les barrières linguistiques dans votre application.",
                 intro: "Choisissez vos fichiers JSON et les langues cibles. Téléchargez votre archive de traduction lorsqu’elle est prête.",
                 newTranslation: "Créer une traduction", startHint: "Choisissez vos fichiers et vos langues pour commencer.",
                 stepFiles: "Ajouter des fichiers JSON", fileHint: "Vous pouvez sélectionner un ou plusieurs fichiers .json.",
@@ -820,7 +824,7 @@ HTML_TEMPLATE = """
                 pageTitle: "Holm Translate — espacio de traducción JSON",
                 interfaceLanguage: "Idioma de la interfaz", themeDark: "Activar modo oscuro", themeLight: "Activar modo claro",
                 privacy: "Espacio de trabajo privado", eyebrow: "Localización JSON",
-                headline: "Derriba las barreras del idioma.",
+                headline: "Derriba las barreras del idioma en tu aplicación.",
                 intro: "Elige tus archivos JSON y los idiomas de destino. Descarga el archivo de traducción cuando esté listo.",
                 newTranslation: "Crear una traducción", startHint: "Elige tus archivos e idiomas para comenzar.",
                 stepFiles: "Añadir archivos JSON", fileHint: "Puedes seleccionar uno o varios archivos .json.",
@@ -834,7 +838,7 @@ HTML_TEMPLATE = """
                 pageTitle: "Holm Translate — przestrzeń tłumaczeń JSON",
                 interfaceLanguage: "Język interfejsu", themeDark: "Włącz ciemny motyw", themeLight: "Włącz jasny motyw",
                 privacy: "Prywatna przestrzeń robocza", eyebrow: "Lokalizacja JSON",
-                headline: "Pokonaj bariery językowe.",
+                headline: "Pokonaj bariery językowe w swojej aplikacji.",
                 intro: "Wybierz pliki JSON i języki docelowe. Pobierz archiwum tłumaczeń, gdy będzie gotowe.",
                 newTranslation: "Utwórz tłumaczenie", startHint: "Wybierz pliki i języki, aby rozpocząć.",
                 stepFiles: "Dodaj pliki JSON", fileHint: "Możesz wybrać jeden lub więcej plików .json.",
@@ -848,7 +852,7 @@ HTML_TEMPLATE = """
                 pageTitle: "Holm Translate — espaço de tradução JSON",
                 interfaceLanguage: "Idioma da interface", themeDark: "Ativar modo escuro", themeLight: "Ativar modo claro",
                 privacy: "Espaço de trabalho privado", eyebrow: "Localização JSON",
-                headline: "Quebre as barreiras linguísticas.",
+                headline: "Quebre as barreiras linguísticas em sua aplicação.",
                 intro: "Escolha seus arquivos JSON e os idiomas de destino. Baixe o arquivo de tradução quando estiver pronto.",
                 newTranslation: "Criar tradução", startHint: "Escolha seus arquivos e idiomas para começar.",
                 stepFiles: "Adicionar arquivos JSON", fileHint: "Você pode selecionar um ou mais arquivos .json.",
@@ -862,7 +866,7 @@ HTML_TEMPLATE = """
                 pageTitle: "Holm Translate — JSON翻訳ワークスペース",
                 interfaceLanguage: "表示言語", themeDark: "ダークモードに切り替え", themeLight: "ライトモードに切り替え",
                 privacy: "プライベートワークスペース", eyebrow: "JSONローカライズ",
-                headline: "言葉の壁を越えましょう。",
+                headline: "アプリにおける言語の壁を取り払っていきましょう、",
                 intro: "JSONファイルと翻訳先の言語を選択してください。翻訳アーカイブの準備ができたらダウンロードできます。",
                 newTranslation: "翻訳を作成", startHint: "ファイルと言語を選択して開始します。",
                 stepFiles: "JSONファイルを追加", fileHint: "1つ以上の.jsonファイルを選択できます。",
@@ -876,7 +880,7 @@ HTML_TEMPLATE = """
                 pageTitle: "Holm Translate — JSON 翻譯工作區",
                 interfaceLanguage: "介面語言", themeDark: "切換為深色模式", themeLight: "切換為淺色模式",
                 privacy: "私人工作區", eyebrow: "JSON 在地化",
-                headline: "跨越語言隔閡。",
+                headline: "跨越語言隔閡。在您的應用程式中。",
                 intro: "選擇 JSON 檔案和目標語言。翻譯封存檔準備完成後即可下載。",
                 newTranslation: "建立翻譯", startHint: "選擇檔案和語言以開始。",
                 stepFiles: "新增 JSON 檔案", fileHint: "可選擇一個或多個 .json 檔案。",
@@ -1035,10 +1039,10 @@ def translate():
 @app.route('/download/<filename>')
 def download_history(filename):
     session_id = get_user_session_id()
-    user_dir = os.path.join(BASE_OUTPUT_DIR, session_id)
-    file_path = os.path.join(user_dir, filename)
+    user_dir = os.path.realpath(os.path.join(BASE_OUTPUT_DIR, session_id))
+    file_path = os.path.realpath(os.path.join(user_dir, filename))
     
-    if os.path.exists(file_path):
+    if os.path.commonpath((user_dir, file_path)) == user_dir and os.path.isfile(file_path):
         return send_file(file_path, as_attachment=True)
     
     return "Yetkisiz erişim veya dosya bulunamadı!", 403
