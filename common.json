@@ -1,0 +1,24 @@
+{
+  "app_name": "Holm Life",
+  "welcome": "Welcome to Holm Life!",
+  "cancel": "Cancel",
+  "save": "Save",
+  "delete": "Delete",
+  "edit": "Edit",
+  "loading": "Loading...",
+  "error": "An error occurred",
+  "success": "Success",
+  "nav": {
+    "home": "Home",
+    "habits": "Habits",
+    "calendar": "Calendar",
+    "notepad": "Notepad",
+    "tasks": "Tasks",
+    "todos": "Todos",
+    "pomodoro": "Pomodoro",
+    "projects": "Projects",
+    "whiteboard": "Whiteboard",
+    "profile": "Profile",
+    "settings": "Settings"
+  }
+}

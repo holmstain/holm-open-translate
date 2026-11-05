@@ -1,0 +1,23 @@
+# Environment & Secrets (Hassas Bilgiler)
+.env
+
+# Virtual Environment (Sanal Ortam)
+venv/
+env/
+ENV/
+
+# User Output Archives (Çeviri Çıktıları ve Kişisel Veriler)
+outputs/
+__pycache__/
+.pytest_cache/
+.vscode
+
+# Python Cache & Compiled Files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# OS specific files
+.DS_Store
+Thumbs.db
