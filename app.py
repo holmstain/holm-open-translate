@@ -22,10 +22,12 @@ BASE_OUTPUT_DIR = os.path.join(os.getcwd(), "outputs")
 os.makedirs(BASE_OUTPUT_DIR, exist_ok=True)
 
 TARGET_LANGUAGES = {
+    "en": "English",
     "ar": "Arabic", "de": "German", "es": "Spanish",
     "fr": "French", "ja": "Japanese", "ko": "Korean",
     "nl": "Dutch", "pl": "Polish", "pt": "Portuguese",
-    "zh": "Chinese", "tr": "Turkish", "it": "Italian", "ru": "Russian"
+    "zh": "Chinese", "zh-TW": "Traditional Chinese",
+    "tr": "Turkish", "it": "Italian", "ru": "Russian"
 }
 
 def get_user_session_id():
@@ -770,7 +772,7 @@ HTML_TEMPLATE = """
                 recent: "Son çeviriler", recentHint: "Bu oturuma ait arşivleriniz.",
                 archive: "Arşiv adı", date: "Tarih", action: "İşlem", download: "İndir",
                 emptyHistory: "Bu oturuma ait bir arşiv henüz yok.<br>İlk çeviriniz tamamlandığında burada görünecek.",
-                targets: { ar: "Arapça", de: "Almanca", es: "İspanyolca", fr: "Fransızca", ja: "Japonca", ko: "Korece", nl: "Felemenkçe", pl: "Lehçe", pt: "Portekizce", zh: "Çince", tr: "Türkçe", it: "İtalyanca", ru: "Rusça" }
+                targets: { en: "İngilizce", ar: "Arapça", de: "Almanca", es: "İspanyolca", fr: "Fransızca", ja: "Japonca", ko: "Korece", nl: "Felemenkçe", pl: "Lehçe", pt: "Portekizce", zh: "Çince", "zh-TW": "Geleneksel Çince", tr: "Türkçe", it: "İtalyanca", ru: "Rusça" }
             },
             en: {
                 pageTitle: "Holm Translate — JSON translation workspace",
@@ -784,7 +786,7 @@ HTML_TEMPLATE = """
                 recent: "Recent translations", recentHint: "Your archives from this session.",
                 archive: "Archive", date: "Date", action: "Action", download: "Download",
                 emptyHistory: "There are no archives in this session yet.<br>Your first translation will appear here.",
-                targets: { ar: "Arabic", de: "German", es: "Spanish", fr: "French", ja: "Japanese", ko: "Korean", nl: "Dutch", pl: "Polish", pt: "Portuguese", zh: "Chinese", tr: "Turkish", it: "Italian", ru: "Russian" }
+                targets: { en: "English", ar: "Arabic", de: "German", es: "Spanish", fr: "French", ja: "Japanese", ko: "Korean", nl: "Dutch", pl: "Polish", pt: "Portuguese", zh: "Chinese", "zh-TW": "Traditional Chinese", tr: "Turkish", it: "Italian", ru: "Russian" }
             },
             de: {
                 pageTitle: "Holm Translate — JSON-Übersetzungsbereich",
@@ -798,7 +800,7 @@ HTML_TEMPLATE = """
                 recent: "Letzte Übersetzungen", recentHint: "Ihre Archive aus dieser Sitzung.",
                 archive: "Archiv", date: "Datum", action: "Aktion", download: "Herunterladen",
                 emptyHistory: "In dieser Sitzung gibt es noch keine Archive.<br>Ihre erste Übersetzung wird hier angezeigt.",
-                targets: { ar: "Arabisch", de: "Deutsch", es: "Spanisch", fr: "Französisch", ja: "Japanisch", ko: "Koreanisch", nl: "Niederländisch", pl: "Polnisch", pt: "Portugiesisch", zh: "Chinesisch", tr: "Türkisch", it: "Italienisch", ru: "Russisch" }
+                targets: { en: "Englisch", ar: "Arabisch", de: "Deutsch", es: "Spanisch", fr: "Französisch", ja: "Japanisch", ko: "Koreanisch", nl: "Niederländisch", pl: "Polnisch", pt: "Portugiesisch", zh: "Chinesisch", "zh-TW": "Traditionelles Chinesisch", tr: "Türkisch", it: "Italienisch", ru: "Russisch" }
             },
             fr: {
                 pageTitle: "Holm Translate — espace de traduction JSON",
@@ -812,7 +814,7 @@ HTML_TEMPLATE = """
                 recent: "Traductions récentes", recentHint: "Vos archives de cette session.",
                 archive: "Archive", date: "Date", action: "Action", download: "Télécharger",
                 emptyHistory: "Aucune archive pour cette session pour le moment.<br>Votre première traduction apparaîtra ici.",
-                targets: { ar: "Arabe", de: "Allemand", es: "Espagnol", fr: "Français", ja: "Japonais", ko: "Coréen", nl: "Néerlandais", pl: "Polonais", pt: "Portugais", zh: "Chinois", tr: "Turc", it: "Italien", ru: "Russe" }
+                targets: { en: "Anglais", ar: "Arabe", de: "Allemand", es: "Espagnol", fr: "Français", ja: "Japonais", ko: "Coréen", nl: "Néerlandais", pl: "Polonais", pt: "Portugais", zh: "Chinois", "zh-TW": "Chinois traditionnel", tr: "Turc", it: "Italien", ru: "Russe" }
             },
             es: {
                 pageTitle: "Holm Translate — espacio de traducción JSON",
@@ -826,7 +828,7 @@ HTML_TEMPLATE = """
                 recent: "Traducciones recientes", recentHint: "Tus archivos de esta sesión.",
                 archive: "Archivo", date: "Fecha", action: "Acción", download: "Descargar",
                 emptyHistory: "Aún no hay archivos en esta sesión.<br>Tu primera traducción aparecerá aquí.",
-                targets: { ar: "Árabe", de: "Alemán", es: "Español", fr: "Francés", ja: "Japonés", ko: "Coreano", nl: "Neerlandés", pl: "Polaco", pt: "Portugués", zh: "Chino", tr: "Turco", it: "Italiano", ru: "Ruso" }
+                targets: { en: "Inglés", ar: "Árabe", de: "Alemán", es: "Español", fr: "Francés", ja: "Japonés", ko: "Coreano", nl: "Neerlandés", pl: "Polaco", pt: "Portugués", zh: "Chino", "zh-TW": "Chino tradicional", tr: "Turco", it: "Italiano", ru: "Ruso" }
             },
             pl: {
                 pageTitle: "Holm Translate — przestrzeń tłumaczeń JSON",
@@ -840,7 +842,7 @@ HTML_TEMPLATE = """
                 recent: "Ostatnie tłumaczenia", recentHint: "Archiwa z tej sesji.",
                 archive: "Archiwum", date: "Data", action: "Akcja", download: "Pobierz",
                 emptyHistory: "W tej sesji nie ma jeszcze archiwów.<br>Pierwsze tłumaczenie pojawi się tutaj.",
-                targets: { ar: "Arabski", de: "Niemiecki", es: "Hiszpański", fr: "Francuski", ja: "Japoński", ko: "Koreański", nl: "Niderlandzki", pl: "Polski", pt: "Portugalski", zh: "Chiński", tr: "Turecki", it: "Włoski", ru: "Rosyjski" }
+                targets: { en: "Angielski", ar: "Arabski", de: "Niemiecki", es: "Hiszpański", fr: "Francuski", ja: "Japoński", ko: "Koreański", nl: "Niderlandzki", pl: "Polski", pt: "Portugalski", zh: "Chiński", "zh-TW": "Chiński tradycyjny", tr: "Turecki", it: "Włoski", ru: "Rosyjski" }
             },
             pt: {
                 pageTitle: "Holm Translate — espaço de tradução JSON",
@@ -854,7 +856,7 @@ HTML_TEMPLATE = """
                 recent: "Traduções recentes", recentHint: "Seus arquivos desta sessão.",
                 archive: "Arquivo", date: "Data", action: "Ação", download: "Baixar",
                 emptyHistory: "Ainda não há arquivos nesta sessão.<br>Sua primeira tradução aparecerá aqui.",
-                targets: { ar: "Árabe", de: "Alemão", es: "Espanhol", fr: "Francês", ja: "Japonês", ko: "Coreano", nl: "Holandês", pl: "Polonês", pt: "Português", zh: "Chinês", tr: "Turco", it: "Italiano", ru: "Russo" }
+                targets: { en: "Inglês", ar: "Árabe", de: "Alemão", es: "Espanhol", fr: "Francês", ja: "Japonês", ko: "Coreano", nl: "Holandês", pl: "Polonês", pt: "Português", zh: "Chinês", "zh-TW": "Chinês tradicional", tr: "Turco", it: "Italiano", ru: "Russo" }
             },
             ja: {
                 pageTitle: "Holm Translate — JSON翻訳ワークスペース",
@@ -868,7 +870,7 @@ HTML_TEMPLATE = """
                 recent: "最近の翻訳", recentHint: "このセッションのアーカイブ",
                 archive: "アーカイブ", date: "日付", action: "操作", download: "ダウンロード",
                 emptyHistory: "このセッションにはまだアーカイブがありません。<br>最初の翻訳が完了すると、ここに表示されます。",
-                targets: { ar: "アラビア語", de: "ドイツ語", es: "スペイン語", fr: "フランス語", ja: "日本語", ko: "韓国語", nl: "オランダ語", pl: "ポーランド語", pt: "ポルトガル語", zh: "中国語", tr: "トルコ語", it: "イタリア語", ru: "ロシア語" }
+                targets: { en: "英語", ar: "アラビア語", de: "ドイツ語", es: "スペイン語", fr: "フランス語", ja: "日本語", ko: "韓国語", nl: "オランダ語", pl: "ポーランド語", pt: "ポルトガル語", zh: "中国語", "zh-TW": "繁体字中国語", tr: "トルコ語", it: "イタリア語", ru: "ロシア語" }
             },
             "zh-TW": {
                 pageTitle: "Holm Translate — JSON 翻譯工作區",
@@ -882,7 +884,7 @@ HTML_TEMPLATE = """
                 recent: "最近的翻譯", recentHint: "此工作階段的封存檔。",
                 archive: "封存檔", date: "日期", action: "操作", download: "下載",
                 emptyHistory: "此工作階段目前沒有封存檔。<br>完成第一次翻譯後，檔案會顯示在這裡。",
-                targets: { ar: "阿拉伯文", de: "德文", es: "西班牙文", fr: "法文", ja: "日文", ko: "韓文", nl: "荷蘭文", pl: "波蘭文", pt: "葡萄牙文", zh: "中文", tr: "土耳其文", it: "義大利文", ru: "俄文" }
+                targets: { en: "英文", ar: "阿拉伯文", de: "德文", es: "西班牙文", fr: "法文", ja: "日文", ko: "韓文", nl: "荷蘭文", pl: "波蘭文", pt: "葡萄牙文", zh: "簡體中文", "zh-TW": "繁體中文", tr: "土耳其文", it: "義大利文", ru: "俄文" }
             }
         };
 
