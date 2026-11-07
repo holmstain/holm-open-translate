@@ -22,12 +22,10 @@ BASE_OUTPUT_DIR = os.path.join(os.getcwd(), "outputs")
 os.makedirs(BASE_OUTPUT_DIR, exist_ok=True)
 
 TARGET_LANGUAGES = {
-    "en": "English",
-    "ar": "Arabic", "de": "German", "es": "Spanish",
-    "fr": "French", "ja": "Japanese", "ko": "Korean",
-    "nl": "Dutch", "pl": "Polish", "pt": "Portuguese",
-    "zh": "Chinese", "zh-TW": "Traditional Chinese",
-    "tr": "Turkish", "it": "Italian", "ru": "Russian"
+    "ar": "Arabic","bg": "Bulgarian","cs": "Czech","da": "Danish","de": "German","el": "Greek","es-ES": "European Spanish","es-419": "Latin America Spanish","et": "Estonian",
+    "fi": "Finnish","fr": "French","hi": "Hindi","hu": "Hungarian","id": "Indonesian","it": "Italian","ja": "Japanese","ko": "Korean","lt": "Lithuanian","lv": "Latvian",
+    "nl": "Dutch","no": "Norwegian","pl": "Polish","pt-PT": "European Portuguese","pt-BR": "Brazil Portuguese","ro": "Romanian","ru": "Russian","sk": "Slovak","sl": "Slovenian",
+    "sv": "Swedish","th": "Thai","tr": "Turkish","uk": "Ukrainian","vi": "Vietnamese","zh-CN": "Simplified Chinese","zh-TW": "Traditional Chinese",
 }
 
 def get_user_session_id():
@@ -74,7 +72,7 @@ HTML_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#eef4ff">
-    <title>Holm Translate</title>
+    <title>Holm Open Translate</title>
     <link rel="icon" type="image/png" href="{{ url_for('favicon', v=1) }}">
     <script>
         (() => {
@@ -138,7 +136,7 @@ HTML_TEMPLATE = """
                 linear-gradient(145deg, #0d1422 0%, #111a2b 48%, #101521 100%);
         }
 
-        .app-shell { max-width: 860px; }
+        .app-shell { max-width: 1300px; }
 
         .topbar {
             display: flex;
@@ -279,7 +277,7 @@ HTML_TEMPLATE = """
             backdrop-filter: blur(24px) saturate(155%);
         }
 
-        .translate-panel { padding: clamp(22px, 5vw, 36px); }
+        .translate-panel {padding: clamp(22px, 5vw, 36px); min-width: 100%; }
         .history-panel { margin-top: 20px; padding: clamp(22px, 4vw, 30px); }
 
         .section-heading {
@@ -374,7 +372,7 @@ HTML_TEMPLATE = """
         .field-hint { margin: 8px 0 0; color: #718099; font-size: 12px; }
 
         .language-grid {
-            max-height: 220px;
+            max-height: 600px;
             overflow-y: auto;
             padding: 12px;
             border: 1px solid rgba(104, 128, 166, .15);
@@ -386,7 +384,7 @@ HTML_TEMPLATE = """
 
         .language-option {
             display: flex;
-            min-height: 44px;
+            min-height: 40px;
             align-items: center;
             gap: 9px;
             padding: 8px 10px;
@@ -644,7 +642,7 @@ HTML_TEMPLATE = """
         <header class="topbar">
             <div class="brand">
                 <img class="brand-logo" src="{{ url_for('static', filename='holm-translate-logo.png') }}" alt="">
-                <span>Holm Translate</span>
+                <span>Holm Open Translate</span>
             </div>
             <div class="topbar-controls">
                 <label class="control-pill language-control">
@@ -761,7 +759,7 @@ HTML_TEMPLATE = """
     <script>
         const translations = {
             tr: {
-                pageTitle: "Holm Translate — JSON çeviri çalışma alanı",
+                pageTitle: "Holm Open Translate — JSON çeviri çalışma alanı",
                 interfaceLanguage: "Arayüz dili", themeDark: "Koyu temayı aç", themeLight: "Açık temayı aç",
                 privacy: "Kişisel çalışma alanı", eyebrow: "JSON yerelleştirme",
                 headline: "Uygulamanızda Dil bariyerlerini ortadan kaldırın.",
@@ -775,7 +773,7 @@ HTML_TEMPLATE = """
                 targets: { en: "İngilizce", ar: "Arapça", de: "Almanca", es: "İspanyolca", fr: "Fransızca", ja: "Japonca", ko: "Korece", nl: "Felemenkçe", pl: "Lehçe", pt: "Portekizce", zh: "Çince", "zh-TW": "Geleneksel Çince", tr: "Türkçe", it: "İtalyanca", ru: "Rusça" }
             },
             en: {
-                pageTitle: "Holm Translate — JSON translation workspace",
+                pageTitle: "Holm Open Translate — JSON translation workspace",
                 interfaceLanguage: "Interface language", themeDark: "Switch to dark mode", themeLight: "Switch to light mode",
                 privacy: "Private workspace", eyebrow: "JSON localization",
                 headline: "Break down language barriers in your app.",
@@ -789,7 +787,7 @@ HTML_TEMPLATE = """
                 targets: { en: "English", ar: "Arabic", de: "German", es: "Spanish", fr: "French", ja: "Japanese", ko: "Korean", nl: "Dutch", pl: "Polish", pt: "Portuguese", zh: "Chinese", "zh-TW": "Traditional Chinese", tr: "Turkish", it: "Italian", ru: "Russian" }
             },
             de: {
-                pageTitle: "Holm Translate — JSON-Übersetzungsbereich",
+                pageTitle: "Holm OpenTranslate — JSON-Übersetzungsbereich",
                 interfaceLanguage: "Oberflächensprache", themeDark: "Dunkelmodus aktivieren", themeLight: "Hellmodus aktivieren",
                 privacy: "Privater Arbeitsbereich", eyebrow: "JSON-Lokalisierung",
                 headline: "Sprachbarrieren in Ihrer App überwinden.",
@@ -803,7 +801,7 @@ HTML_TEMPLATE = """
                 targets: { en: "Englisch", ar: "Arabisch", de: "Deutsch", es: "Spanisch", fr: "Französisch", ja: "Japanisch", ko: "Koreanisch", nl: "Niederländisch", pl: "Polnisch", pt: "Portugiesisch", zh: "Chinesisch", "zh-TW": "Traditionelles Chinesisch", tr: "Türkisch", it: "Italienisch", ru: "Russisch" }
             },
             fr: {
-                pageTitle: "Holm Translate — espace de traduction JSON",
+                pageTitle: "Holm Open Translate — espace de traduction JSON",
                 interfaceLanguage: "Langue de l’interface", themeDark: "Activer le thème sombre", themeLight: "Activer le thème clair",
                 privacy: "Espace de travail privé", eyebrow: "Localisation JSON",
                 headline: "Brisez les barrières linguistiques dans votre application.",
@@ -817,7 +815,7 @@ HTML_TEMPLATE = """
                 targets: { en: "Anglais", ar: "Arabe", de: "Allemand", es: "Espagnol", fr: "Français", ja: "Japonais", ko: "Coréen", nl: "Néerlandais", pl: "Polonais", pt: "Portugais", zh: "Chinois", "zh-TW": "Chinois traditionnel", tr: "Turc", it: "Italien", ru: "Russe" }
             },
             es: {
-                pageTitle: "Holm Translate — espacio de traducción JSON",
+                pageTitle: "Holm Open Translate — espacio de traducción JSON",
                 interfaceLanguage: "Idioma de la interfaz", themeDark: "Activar modo oscuro", themeLight: "Activar modo claro",
                 privacy: "Espacio de trabajo privado", eyebrow: "Localización JSON",
                 headline: "Derriba las barreras del idioma en tu aplicación.",
@@ -831,7 +829,7 @@ HTML_TEMPLATE = """
                 targets: { en: "Inglés", ar: "Árabe", de: "Alemán", es: "Español", fr: "Francés", ja: "Japonés", ko: "Coreano", nl: "Neerlandés", pl: "Polaco", pt: "Portugués", zh: "Chino", "zh-TW": "Chino tradicional", tr: "Turco", it: "Italiano", ru: "Ruso" }
             },
             pl: {
-                pageTitle: "Holm Translate — przestrzeń tłumaczeń JSON",
+                pageTitle: "Holm Open Translate — przestrzeń tłumaczeń JSON",
                 interfaceLanguage: "Język interfejsu", themeDark: "Włącz ciemny motyw", themeLight: "Włącz jasny motyw",
                 privacy: "Prywatna przestrzeń robocza", eyebrow: "Lokalizacja JSON",
                 headline: "Pokonaj bariery językowe w swojej aplikacji.",
@@ -845,7 +843,7 @@ HTML_TEMPLATE = """
                 targets: { en: "Angielski", ar: "Arabski", de: "Niemiecki", es: "Hiszpański", fr: "Francuski", ja: "Japoński", ko: "Koreański", nl: "Niderlandzki", pl: "Polski", pt: "Portugalski", zh: "Chiński", "zh-TW": "Chiński tradycyjny", tr: "Turecki", it: "Włoski", ru: "Rosyjski" }
             },
             pt: {
-                pageTitle: "Holm Translate — espaço de tradução JSON",
+                pageTitle: "Holm Open Translate — espaço de tradução JSON",
                 interfaceLanguage: "Idioma da interface", themeDark: "Ativar modo escuro", themeLight: "Ativar modo claro",
                 privacy: "Espaço de trabalho privado", eyebrow: "Localização JSON",
                 headline: "Quebre as barreiras linguísticas em sua aplicação.",
@@ -859,7 +857,7 @@ HTML_TEMPLATE = """
                 targets: { en: "Inglês", ar: "Árabe", de: "Alemão", es: "Espanhol", fr: "Francês", ja: "Japonês", ko: "Coreano", nl: "Holandês", pl: "Polonês", pt: "Português", zh: "Chinês", "zh-TW": "Chinês tradicional", tr: "Turco", it: "Italiano", ru: "Russo" }
             },
             ja: {
-                pageTitle: "Holm Translate — JSON翻訳ワークスペース",
+                pageTitle: "Holm Open Translate — JSON翻訳ワークスペース",
                 interfaceLanguage: "表示言語", themeDark: "ダークモードに切り替え", themeLight: "ライトモードに切り替え",
                 privacy: "プライベートワークスペース", eyebrow: "JSONローカライズ",
                 headline: "アプリにおける言語の壁を取り払っていきましょう、",
@@ -873,7 +871,7 @@ HTML_TEMPLATE = """
                 targets: { en: "英語", ar: "アラビア語", de: "ドイツ語", es: "スペイン語", fr: "フランス語", ja: "日本語", ko: "韓国語", nl: "オランダ語", pl: "ポーランド語", pt: "ポルトガル語", zh: "中国語", "zh-TW": "繁体字中国語", tr: "トルコ語", it: "イタリア語", ru: "ロシア語" }
             },
             "zh-TW": {
-                pageTitle: "Holm Translate — JSON 翻譯工作區",
+                pageTitle: "Holm Open Translate — JSON 翻譯工作區",
                 interfaceLanguage: "介面語言", themeDark: "切換為深色模式", themeLight: "切換為淺色模式",
                 privacy: "私人工作區", eyebrow: "JSON 在地化",
                 headline: "跨越語言隔閡。在您的應用程式中。",

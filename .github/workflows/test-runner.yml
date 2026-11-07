@@ -1,0 +1,13 @@
+name: Test Self-Hosted Runner
+on: [push]
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Test Oracle Cloud Environment
+        run: |
+          echo "Runner is active on Oracle Cloud ARM64!"
+          docker --version
+          free -h

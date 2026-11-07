@@ -1,6 +1,6 @@
-# Holm Translate
+# Holm Open Translate
 
-Holm Translate is a Flask application for translating JSON localization files with the NVIDIA NIM translation API. Upload one or more JSON files, choose target languages, and download the translated files in a ZIP archive.
+Holm Open Translate is a Flask application for translating JSON localization files with the NVIDIA NIM translation API. Upload one or more JSON files, choose target languages, and download the translated files in a ZIP archive.
 
 ## Languages
 
@@ -103,9 +103,9 @@ This project is distributed under the MIT License.
 
 ---
 
-# 🇹🇷 Holm Translate — Türkçe
+# 🇹🇷 Holm Open Translate — Türkçe
 
-Holm Translate, JSON yerelleştirme dosyalarını NVIDIA NIM çeviri API’siyle çevirmek için geliştirilmiş bir Flask uygulamasıdır. Bir veya daha fazla JSON dosyası yükleyin, hedef dilleri seçin ve çevrilmiş dosyaları ZIP arşivi olarak indirin.
+Holm Open Translate, JSON yerelleştirme dosyalarını NVIDIA NIM çeviri API’siyle çevirmek için geliştirilmiş bir Flask uygulamasıdır. Bir veya daha fazla JSON dosyası yükleyin, hedef dilleri seçin ve çevrilmiş dosyaları ZIP arşivi olarak indirin.
 
 ## Özellikler
 
@@ -202,9 +202,9 @@ Bu proje MIT Lisansı ile dağıtılır.
 
 ---
 
-# 🇪🇸 Holm Translate — Español
+# 🇪🇸 Holm Open Translate — Español
 
-Holm Translate es una aplicación Flask para traducir archivos de localización JSON mediante la API de traducción NVIDIA NIM. Sube uno o varios archivos JSON, elige los idiomas de destino y descarga los archivos traducidos en un archivo ZIP.
+Holm Open Translate es una aplicación Flask para traducir archivos de localización JSON mediante la API de traducción NVIDIA NIM. Sube uno o varios archivos JSON, elige los idiomas de destino y descarga los archivos traducidos en un archivo ZIP.
 
 ## Funciones
 
@@ -301,9 +301,9 @@ Este proyecto se distribuye bajo la licencia MIT.
 
 ---
 
-# 🇵🇱 Holm Translate — Polski
+# 🇵🇱 Holm Open Translate — Polski
 
-Holm Translate to aplikacja Flask do tłumaczenia plików lokalizacyjnych JSON za pomocą API tłumaczeniowego NVIDIA NIM. Prześlij jeden lub więcej plików JSON, wybierz języki docelowe i pobierz przetłumaczone pliki w archiwum ZIP.
+Holm Open Translate to aplikacja Flask do tłumaczenia plików lokalizacyjnych JSON za pomocą API tłumaczeniowego NVIDIA NIM. Prześlij jeden lub więcej plików JSON, wybierz języki docelowe i pobierz przetłumaczone pliki w archiwum ZIP.
 
 ## Funkcje
 
@@ -400,9 +400,9 @@ Projekt jest rozpowszechniany na licencji MIT.
 
 ---
 
-# 🇵🇹 Holm Translate — Português
+# 🇵🇹 Holm Open Translate — Português
 
-Holm Translate é uma aplicação Flask para traduzir ficheiros de localização JSON através da API de tradução NVIDIA NIM. Carregue um ou mais ficheiros JSON, escolha os idiomas de destino e transfira os ficheiros traduzidos num arquivo ZIP.
+Holm Open Translate é uma aplicação Flask para traduzir ficheiros de localização JSON através da API de tradução NVIDIA NIM. Carregue um ou mais ficheiros JSON, escolha os idiomas de destino e transfira os ficheiros traduzidos num arquivo ZIP.
 
 ## Funcionalidades
 
@@ -499,9 +499,9 @@ Este projeto é distribuído ao abrigo da licença MIT.
 
 ---
 
-# 🇹🇼 Holm Translate — 繁體中文
+# 🇹🇼 Holm Open Translate — 繁體中文
 
-Holm Translate 是一個使用 Flask 建置的應用程式，透過 NVIDIA NIM 翻譯 API 翻譯 JSON 在地化檔案。您可以上傳一個或多個 JSON 檔案、選擇目標語言，並將翻譯結果下載為 ZIP 封存檔。
+Holm Open Translate 是一個使用 Flask 建置的應用程式，透過 NVIDIA NIM 翻譯 API 翻譯 JSON 在地化檔案。您可以上傳一個或多個 JSON 檔案、選擇目標語言，並將翻譯結果下載為 ZIP 封存檔。
 
 ## 功能
 
@@ -598,9 +598,9 @@ python -m unittest test_translator.py
 
 ---
 
-# 🇯🇵 Holm Translate — 日本語
+# 🇯🇵 Holm Open Translate — 日本語
 
-Holm Translateは、NVIDIA NIM翻訳APIを使用してJSONローカライズファイルを翻訳するFlaskアプリケーションです。1つ以上のJSONファイルをアップロードし、翻訳先の言語を選択すると、翻訳済みファイルをZIPアーカイブとしてダウンロードできます。
+Holm Open Translateは、NVIDIA NIM翻訳APIを使用してJSONローカライズファイルを翻訳するFlaskアプリケーションです。1つ以上のJSONファイルをアップロードし、翻訳先の言語を選択すると、翻訳済みファイルをZIPアーカイブとしてダウンロードできます。
 
 ## 機能
 
