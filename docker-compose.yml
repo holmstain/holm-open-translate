@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      # Load from the local .env file or the workflow's GitHub secret.
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:?Set NVIDIA_API_KEY in .env or the environment}
+    volumes:
+      # Keep translation archives across container replacements.
+      - outputs:/app/outputs
+    restart: unless-stopped
+
+volumes:
+  outputs:
