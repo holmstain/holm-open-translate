@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ "master", "main" ]
+    branches: [ "master" ]
 
 jobs:
   deploy:
@@ -17,20 +17,4 @@ jobs:
         run: |
           cd ~/holm-translate
           docker compose down
-          docker compose up --build -dname: Deploy
-
-on:
-  push:
-    branches: [master]
-
-jobs:
-  deploy:
-    runs-on: self-hosted
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-      - name: Build and restart services
-        # Add NVIDIA_API_KEY to this repository's Actions secrets.
-        env:
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-        run: docker compose up --build -d
+          docker compose up --build -d
