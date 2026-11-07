@@ -1,4 +1,23 @@
-name: Deploy
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "master", "main" ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build and Run with Docker Compose
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        run: |
+          cd ~/holm-translate
+          docker compose down
+          docker compose up --build -dname: Deploy
 
 on:
   push:
