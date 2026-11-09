@@ -4,6 +4,7 @@ import io
 import zipfile
 import uuid
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template_string, request, send_file, make_response
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -16,7 +17,7 @@ API_KEY = os.getenv("NVIDIA_API_KEY")
 BASE_URL = "https://integrate.api.nvidia.com/v1"
 MODEL_NAME = "nvidia/riva-translate-4b-instruct-v2"
 
-client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
+client = OpenAI(base_url=BASE_URL, api_key=API_KEY, timeout=30.0)
 
 BASE_OUTPUT_DIR = os.path.join(os.getcwd(), "outputs")
 os.makedirs(BASE_OUTPUT_DIR, exist_ok=True)
@@ -610,6 +611,23 @@ HTML_TEMPLATE = """
             box-shadow: 0 10px 30px rgba(0,0,0,.15);
         }
 
+        .progress-success {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding-top: 8px;
+        }
+
+        .progress-success .fa-check-circle {
+            color: var(--accent-color);
+            font-size: 18px;
+        }
+
+        .progress-success #progress-success-text {
+            color: var(--card-fg);
+            font-weight: 600;
+        }
+
         .history-heading { margin-bottom: 18px; }
 
         .history-table {
@@ -800,6 +818,10 @@ HTML_TEMPLATE = """
                     <div class="progress-container">
                         <div class="progress-bar" id="progress-bar"></div>
                     </div>
+                    <div class="progress-success" id="progress-success" style="display:none; align-items:center; gap:10px;">
+                        <i class="fa-solid fa-check-circle" aria-hidden="true" style="color:var(--accent-color); font-size:18px;"></i>
+                        <span id="progress-success-text" data-i18n="progressDone" style="color:var(--card-fg); font-weight:600;"></span>
+                    </div>
                 </div>
 
                 <button type="submit" class="btn btn-translate w-100" id="translate-btn">
@@ -868,6 +890,7 @@ HTML_TEMPLATE = """
                 progressUpload: "Yükleniyor",
                 progressTranslating: "Çeviriliyor…",
                 progressFinishing: "Arşivi hazırlıyor…",
+                progressDone: "Çeviri işlemi başarıyla tamamlandı",
                 targets: { en: "İngilizce", ar: "Arapça", de: "Almanca", es: "İspanyolca", fr: "Fransızca", ja: "Japonca", ko: "Korece", nl: "Felemenkçe", pl: "Lehçe", pt: "Portekizce", zh: "Çince", "zh-TW": "Geleneksel Çince", tr: "Türkçe", it: "İtalyanca", ru: "Rusça" }
             },
             en: {
@@ -886,6 +909,7 @@ HTML_TEMPLATE = """
                 progressUpload: "Uploading",
                 progressTranslating: "Translating…",
                 progressFinishing: "Preparing archive…",
+                progressDone: "Translation completed successfully",
                 targets: { en: "English", ar: "Arabic", de: "German", es: "Spanish", fr: "French", ja: "Japanese", ko: "Korean", nl: "Dutch", pl: "Polish", pt: "Portuguese", zh: "Chinese", "zh-TW": "Traditional Chinese", tr: "Turkish", it: "Italian", ru: "Russian" }
             },
             de: {
@@ -900,6 +924,11 @@ HTML_TEMPLATE = """
                 recent: "Letzte Übersetzungen", recentHint: "Ihre Archive aus dieser Sitzung.",
                 archive: "Archiv", date: "Datum", action: "Aktion", download: "Herunterladen",
                 emptyHistory: "In dieser Sitzung gibt es noch keine Archive.<br>Ihre erste Übersetzung wird hier angezeigt.",
+                progressPreparing: "Dateien werden vorbereitet…",
+                progressUpload: "Hochladen",
+                progressTranslating: "Übersetzung…",
+                progressFinishing: "Archiv wird vorbereitet…",
+                progressDone: "Übersetzung erfolgreich abgeschlossen",
                 targets: { en: "Englisch", ar: "Arabisch", de: "Deutsch", es: "Spanisch", fr: "Französisch", ja: "Japanisch", ko: "Koreanisch", nl: "Niederländisch", pl: "Polnisch", pt: "Portugiesisch", zh: "Chinesisch", "zh-TW": "Traditionelles Chinesisch", tr: "Türkisch", it: "Italienisch", ru: "Russisch" }
             },
             fr: {
@@ -914,6 +943,11 @@ HTML_TEMPLATE = """
                 recent: "Traductions récentes", recentHint: "Vos archives de cette session.",
                 archive: "Archive", date: "Date", action: "Action", download: "Télécharger",
                 emptyHistory: "Aucune archive pour cette session pour le moment.<br>Votre première traduction apparaîtra ici.",
+                progressPreparing: "Préparation des fichiers…",
+                progressUpload: "Envoi",
+                progressTranslating: "Traduction…",
+                progressFinishing: "Préparation de l'archive…",
+                progressDone: "Traduction terminée avec succès",
                 targets: { en: "Anglais", ar: "Arabe", de: "Allemand", es: "Espagnol", fr: "Français", ja: "Japonais", ko: "Coréen", nl: "Néerlandais", pl: "Polonais", pt: "Portugais", zh: "Chinois", "zh-TW": "Chinois traditionnel", tr: "Turc", it: "Italien", ru: "Russe" }
             },
             es: {
@@ -932,6 +966,7 @@ HTML_TEMPLATE = """
                 progressUpload: "Subiendo",
                 progressTranslating: "Traduciendo…",
                 progressFinishing: "Preparando archivo…",
+                progressDone: "Traducción completada con éxito",
                 targets: { en: "Inglés", ar: "Árabe", de: "Alemán", es: "Español", fr: "Francés", ja: "Japonés", ko: "Coreano", nl: "Neerlandés", pl: "Polaco", pt: "Portugués", zh: "Chino", "zh-TW": "Chino tradicional", tr: "Turco", it: "Italiano", ru: "Ruso" }
             },
             pl: {
@@ -1127,11 +1162,21 @@ HTML_TEMPLATE = """
 
                 if (elapsed >= TOTAL_MS && !submitted) {
                     submitted = true;
-                    wrap.style.display = "none";
-                    bar.style.width = "0%";
-                    btn.disabled = false;
-                    btn.innerHTML = btn.dataset.label;
-                    form.submit();
+                    bar.style.width = "100%";
+                    pct.textContent = "100%";
+                    document.getElementById("progress-status").style.display = "none";
+                    document.getElementById("progress-label").style.display = "none";
+                    document.getElementById("progress-bar").style.display = "none";
+                    const success = document.getElementById("progress-success");
+                    const successText = document.getElementById("progress-success-text");
+                    success.style.display = "flex";
+                    setTextByKey(successText, "progressDone");
+                    setTimeout(() => {
+                        wrap.style.display = "none";
+                        btn.innerHTML = btn.dataset.label;
+                        btn.disabled = false;
+                        form.submit();
+                    }, 1000);
                     return;
                 }
 
@@ -1187,15 +1232,15 @@ def translate():
     user_dir = os.path.join(BASE_OUTPUT_DIR, session_id)
     os.makedirs(user_dir, exist_ok=True)
 
-    uploaded_files = request.files.getlist('files')
-    selected_langs = request.form.getlist('languages')
+    try:
+        uploaded_files = request.files.getlist('files')
+        selected_langs = request.form.getlist('languages')
 
-    if not uploaded_files or not selected_langs:
-        return "Please select at least one file and language!", 400
+        if not uploaded_files or not selected_langs:
+            return "Please select at least one file and language!", 400
 
-    memory_file = io.BytesIO()
-
-    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+        # Load all source data from uploaded files first
+        source_items = []
         for file in uploaded_files:
             if not file.filename.endswith('.json'):
                 continue
@@ -1209,30 +1254,55 @@ def translate():
 
             for code in selected_langs:
                 lang_name = TARGET_LANGUAGES.get(code)
-                translated_data = translate_recursive_parallel(source_data, lang_name)
-                output_filename = f"{base_name}_{code}.json"
-                json_bytes = json.dumps(translated_data, ensure_ascii=False, indent=2).encode('utf-8')
-                zf.writestr(output_filename, json_bytes)
+                if lang_name is None:
+                    continue
+                source_items.append((base_name, code, lang_name, source_data))
 
-    memory_file.seek(0)
-    
-    timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-    zip_filename = f"ceviri_arsivi_{timestamp_str}.zip"
-    save_path = os.path.join(user_dir, zip_filename)
-    
-    with open(save_path, 'wb') as f_out:
-        f_out.write(memory_file.getvalue())
+        memory_file = io.BytesIO()
 
-    memory_file.seek(0)
-    
-    resp = make_response(send_file(
-        memory_file,
-        mimetype='application/zip',
-        as_attachment=True,
-        download_name=zip_filename
-    ))
-    resp.set_cookie("user_session", session_id)
-    return resp
+        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+            # Translate files × languages concurrently to avoid sequential API timeout
+            max_workers = min(len(source_items), 8)
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_item = {}
+                for base_name, code, lang_name, source_data in source_items:
+                    future = executor.submit(translate_recursive_parallel, source_data, lang_name)
+                    future_to_item[future] = (base_name, code, source_data)
+
+                for future in as_completed(future_to_item):
+                    base_name, code, source_data = future_to_item[future]
+                    try:
+                        translated_data = future.result()
+                    except Exception:
+                        # Fall back to source data on any translation failure
+                        translated_data = source_data
+
+                    output_filename = f"{base_name}_{code}.json"
+                    json_bytes = json.dumps(translated_data, ensure_ascii=False, indent=2).encode('utf-8')
+                    zf.writestr(output_filename, json_bytes)
+
+        memory_file.seek(0)
+
+        timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+        zip_filename = f"ceviri_arsivi_{timestamp_str}.zip"
+        save_path = os.path.join(user_dir, zip_filename)
+
+        with open(save_path, 'wb') as f_out:
+            f_out.write(memory_file.getvalue())
+
+        memory_file.seek(0)
+
+        resp = make_response(send_file(
+            memory_file,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=zip_filename
+        ))
+        resp.set_cookie("user_session", session_id)
+        return resp
+
+    except Exception:
+        return "Translation failed. Please try again with fewer files or languages.", 500
 
 @app.route('/download/<filename>')
 def download_history(filename):
