@@ -1239,6 +1239,14 @@ def translate():
         if not uploaded_files or not selected_langs:
             return "Please select at least one file and language!", 400
 
+        # Sadece kullanıcının işaretlediği ve sistemde tanımlı olan dilleri seç.
+        # TARGET_LANGUAGES'te olmayan veya formda gelmeyen hiçbir dil çevrilmeyecektir.
+        valid_lang_codes = set(TARGET_LANGUAGES.keys())
+        selected_langs = [code for code in selected_langs if code in valid_lang_codes]
+
+        if not selected_langs:
+            return "Geçerli bir hedef dil seçilmedi!", 400
+
         # Load all source data from uploaded files first
         source_items = []
         for file in uploaded_files:
@@ -1252,10 +1260,9 @@ def translate():
             except Exception:
                 continue
 
+            # Yalnızca seçilen (ve geçerli) dillere çeviri yapılır, tüm dillere değil.
             for code in selected_langs:
-                lang_name = TARGET_LANGUAGES.get(code)
-                if lang_name is None:
-                    continue
+                lang_name = TARGET_LANGUAGES[code]
                 source_items.append((base_name, code, lang_name, source_data))
 
         memory_file = io.BytesIO()
