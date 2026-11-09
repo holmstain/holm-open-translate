@@ -11,10 +11,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build and Run with Docker Compose
+      - name: Write .env file
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: |
-          cd ~/holm-translate
+          echo "NVIDIA_API_KEY=${NVIDIA_API_KEY}" > /home/holmstain/projects/Holm-OpenTranslate/holm-open-translate/.env
+
+      - name: Build and Run with Docker Compose
+        run: |
+          cd /home/holmstain/projects/Holm-OpenTranslate/holm-open-translate
           docker compose down
           docker compose up --build -d
