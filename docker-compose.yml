@@ -1,15 +1,23 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: holm-open-translate
+    restart: unless-stopped
     ports:
       - "5000:5000"
-    environment:
-      # Load from the local .env file or the workflow's GitHub secret.
-      NVIDIA_API_KEY: ${NVIDIA_API_KEY:?Set NVIDIA_API_KEY in .env or the environment}
+    env_file:
+      - .env
     volumes:
-      # Keep translation archives across container replacements.
-      - outputs:/app/outputs
-    restart: unless-stopped
+      # Çeviri arşivi (ZIP çıktıları) konteyner yeniden başlatmalarında kalıcı kalır.
+      - holm_outputs:/app/outputs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 volumes:
-  outputs:
+  holm_outputs:
