@@ -1130,7 +1130,7 @@ HTML_TEMPLATE = """
                     wrap.style.display = "none";
                     bar.style.width = "0%";
                     btn.disabled = false;
-                    btn.textContent = btn.dataset.label;
+                    btn.innerHTML = btn.dataset.label;
                     form.submit();
                     return;
                 }
