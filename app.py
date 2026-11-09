@@ -3,6 +3,8 @@ import json
 import io
 import zipfile
 import uuid
+import logging
+import threading
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template_string, request, send_file, make_response
@@ -10,6 +12,9 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder="assets")
 
@@ -42,27 +47,40 @@ def get_user_session_id():
 def translate_text(text, lang_name):
     if not isinstance(text, str) or not text.strip():
         return text
-    
-    prompt = f"Translate the following UI text strictly into {lang_name}. Return ONLY the translated text, nothing else:\n\n{text}"
-    try:
-        completion = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=256
-        )
-        translated = completion.choices[0].message.content.strip()
-        return translated if translated else text
-    except Exception:
-        return text
 
-def translate_recursive_parallel(data, lang_name):
+    prompt = f"Translate the following UI text strictly into {lang_name}. Return ONLY the translated text, nothing else:\n\n{text}"
+    completion = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,
+        max_tokens=256
+    )
+    translated = completion.choices[0].message.content.strip()
+    return translated if translated else text
+
+def translate_recursive_parallel(data, lang_name, _stats=None, _lock=None):
+    """Recursively translate all string values in JSON, preserving keys and structure.
+
+    _stats: dict with 'failed' and 'total' counters (thread-safe via _lock).
+    _lock: threading.Lock to protect _stats.
+    """
     if isinstance(data, dict):
-        return {k: translate_recursive_parallel(v, lang_name) for k, v in data.items()}
+        return {k: translate_recursive_parallel(v, lang_name, _stats, _lock) for k, v in data.items()}
     elif isinstance(data, list):
-        return [translate_recursive_parallel(item, lang_name) for item in data]
+        return [translate_recursive_parallel(item, lang_name, _stats, _lock) for item in data]
     elif isinstance(data, str):
-        return translate_text(data, lang_name)
+        if _stats is not None and _lock is not None:
+            with _lock:
+                _stats['total'] = _stats.get('total', 0) + 1
+        try:
+            return translate_text(data, lang_name)
+        except Exception as exc:
+            # Tek bir string çevrilişemese de diğerlerinin devam etmesi için buraya yakala.
+            logger.error("Çeviri hatası ('%s' -> %s): %s", data[:80], lang_name, exc)
+            if _stats is not None and _lock is not None:
+                with _lock:
+                    _stats['failed'] = _stats.get('failed', 0) + 1
+            return data
     else:
         return data
 
@@ -1267,13 +1285,16 @@ def translate():
 
         memory_file = io.BytesIO()
 
+        stats = {'failed': 0}
+        lock = threading.Lock()
+
         with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
             # Translate files × languages concurrently to avoid sequential API timeout
             max_workers = min(len(source_items), 8)
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_item = {}
                 for base_name, code, lang_name, source_data in source_items:
-                    future = executor.submit(translate_recursive_parallel, source_data, lang_name)
+                    future = executor.submit(translate_recursive_parallel, source_data, lang_name, stats, lock)
                     future_to_item[future] = (base_name, code, source_data)
 
                 for future in as_completed(future_to_item):
@@ -1281,12 +1302,19 @@ def translate():
                     try:
                         translated_data = future.result()
                     except Exception:
-                        # Fall back to source data on any translation failure
                         translated_data = source_data
 
                     output_filename = f"{base_name}_{code}.json"
                     json_bytes = json.dumps(translated_data, ensure_ascii=False, indent=2).encode('utf-8')
                     zf.writestr(output_filename, json_bytes)
+
+        translation_total = stats.get('total', 0)
+        translation_failed = stats.get('failed', 0)
+
+        # Tüm çeviriler başarısız olduysa API'nin çalışmadığından emin ol — kullanıcıyı bilgilendir.
+        if translation_total > 0 and translation_failed == translation_total:
+            logger.error("Tüm %d çeviri işlemi başarısız oldu. NVIDIA NIM API'sine erişim sağlanamıyor olabilir.", translation_total)
+            return "Çeviri hizmetine erişilemiyor. Lütfen NVIDIA API anahtarınızı ve internet bağlantınızı kontrol edip tekrar deneyin.", 502
 
         memory_file.seek(0)
 
