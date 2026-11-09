@@ -15,6 +15,6 @@ jobs:
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: |
-          cd /home/holmstain/projects/Holm-OpenTranslate/holm-open-translate
+          docker rm -f holm-translate-app-1 2>/dev/null || true
           docker compose down
           docker compose up --build -d
