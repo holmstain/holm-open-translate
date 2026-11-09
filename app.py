@@ -90,27 +90,60 @@ HTML_TEMPLATE = """
     </script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             color-scheme: light;
-            --ink: #17243b;
-            --muted: #64748b;
-            --accent: #2864db;
-            --accent-dark: #174ab5;
-            --glass: rgba(255, 255, 255, 0.72);
-            --glass-border: rgba(255, 255, 255, 0.88);
-            --line: rgba(89, 113, 151, 0.16);
+            --bg: #0F172A;
+            --fg: #F8FAFC;
+            --primary: #1E293B;
+            --on-primary: #FFFFFF;
+            --secondary: #334155;
+            --on-secondary: #FFFFFF;
+            --accent: #22C55E;
+            --on-accent: #0F172A;
+            --card: #1B2336;
+            --card-fg: #F8FAFC;
+            --muted: #272F42;
+            --muted-fg: #94A3B8;
+            --border: #475569;
+            --destructive: #EF4444;
+            --on-destructive: #000000;
+            --ring: #FFFFFF;
+            --ink: var(--fg);
+            --muted-text: var(--muted-fg);
+            --accent-color: var(--accent);
+            --glass: rgba(27, 35, 54, 0.72);
+            --glass-border: rgba(71, 85, 105, 0.48);
+            --line: rgba(71, 85, 105, 0.28);
         }
 
         :root[data-theme="dark"] {
             color-scheme: dark;
-            --ink: #e7edf8;
-            --muted: #b0bdd2;
-            --accent: #82aaff;
-            --accent-dark: #a9c2ff;
-            --glass: rgba(24, 33, 51, 0.83);
-            --glass-border: rgba(164, 184, 218, 0.2);
-            --line: rgba(172, 190, 220, 0.15);
+            --bg: #0F172A;
+            --fg: #F8FAFC;
+            --primary: #1E293B;
+            --on-primary: #FFFFFF;
+            --secondary: #334155;
+            --on-secondary: #FFFFFF;
+            --accent: #22C55E;
+            --on-accent: #0F172A;
+            --card: #1B2336;
+            --card-fg: #F8FAFC;
+            --muted: #272F42;
+            --muted-fg: #94A3B8;
+            --border: #475569;
+            --destructive: #EF4444;
+            --on-destructive: #000000;
+            --ring: #FFFFFF;
+            --ink: var(--fg);
+            --muted-text: var(--muted-fg);
+            --accent-color: var(--accent);
+            --glass: rgba(27, 35, 54, 0.78);
+            --glass-border: rgba(71, 85, 105, 0.32);
+            --line: rgba(71, 85, 105, 0.22);
         }
 
         * { box-sizing: border-box; }
@@ -121,19 +154,20 @@ HTML_TEMPLATE = """
             padding: 48px 0;
             overflow-x: hidden;
             color: var(--ink);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background:
-                radial-gradient(ellipse at 12% 8%, rgba(166, 202, 255, 0.64), transparent 34rem),
-                radial-gradient(ellipse at 92% 38%, rgba(199, 188, 255, 0.42), transparent 34rem),
-                linear-gradient(145deg, #f3f7ff 0%, #edf2fb 48%, #f7f8fc 100%);
+            background: var(--bg);
+            font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             transition: background-color .2s ease, color .2s ease;
         }
 
         :root[data-theme="dark"] body {
             background:
-                radial-gradient(ellipse at 12% 8%, rgba(39, 72, 131, 0.36), transparent 34rem),
-                radial-gradient(ellipse at 92% 38%, rgba(71, 54, 117, 0.3), transparent 34rem),
-                linear-gradient(145deg, #0d1422 0%, #111a2b 48%, #101521 100%);
+                radial-gradient(ellipse at 12% 8%, rgba(34, 197, 94, 0.06), transparent 34rem),
+                radial-gradient(ellipse at 92% 38%, rgba(30, 41, 59, 0.5), transparent 34rem),
+                linear-gradient(145deg, #0b1120 0%, #0f172a 48%, #111827 100%);
+        }
+
+        h1, h2, .section-heading h2, .brand, .step-label, .eyebrow {
+            font-family: "JetBrains Mono", monospace;
         }
 
         .app-shell { max-width: 1300px; }
@@ -176,16 +210,16 @@ HTML_TEMPLATE = """
             align-items: center;
             gap: 8px;
             padding: 9px 13px;
-            color: #43536b;
-            border: 1px solid rgba(255,255,255,.8);
+            color: var(--card-fg);
+            border: 1px solid var(--glass-border);
             border-radius: 999px;
-            background: rgba(255,255,255,.58);
-            box-shadow: 0 5px 16px rgba(42, 63, 96, .05), inset 0 1px 0 #fff;
+            background: var(--glass);
+            box-shadow: 0 5px 16px rgba(0, 0, 0, .12), inset 0 1px 0 rgba(255,255,255,.12);
             font-size: 12px;
             font-weight: 600;
         }
 
-        .privacy-pill i { color: #328365; }
+        .privacy-pill i { color: var(--accent-color); }
 
         .control-pill {
             display: inline-flex;
@@ -194,11 +228,11 @@ HTML_TEMPLATE = """
             justify-content: center;
             gap: 8px;
             padding: 7px 11px;
-            color: #43536b;
-            border: 1px solid rgba(255,255,255,.82);
+            color: var(--card-fg);
+            border: 1px solid var(--glass-border);
             border-radius: 999px;
-            background: rgba(255,255,255,.62);
-            box-shadow: 0 5px 16px rgba(42, 63, 96, .05), inset 0 1px 0 #fff;
+            background: var(--glass);
+            box-shadow: 0 5px 16px rgba(0, 0, 0, .12), inset 0 1px 0 rgba(255,255,255,.12);
             font-size: 12px;
             font-weight: 620;
         }
@@ -224,8 +258,8 @@ HTML_TEMPLATE = """
         }
 
         .theme-toggle:hover, .language-control:focus-within {
-            border-color: rgba(80, 119, 185, .35);
-            background: rgba(255,255,255,.88);
+            border-color: var(--accent-color);
+            background: rgba(255,255,255,.15);
         }
 
         .intro { max-width: 660px; margin: 0 auto 30px; text-align: center; }
@@ -252,7 +286,7 @@ HTML_TEMPLATE = """
 
         h1 {
             margin: 0;
-            color: #192742;
+            color: var(--card-fg);
             font-size: clamp(2.15rem, 5vw, 3.25rem);
             font-weight: 720;
             letter-spacing: -.055em;
@@ -261,7 +295,7 @@ HTML_TEMPLATE = """
 
         .intro p {
             margin: 14px auto 0;
-            color: #61708a;
+            color: var(--muted-fg);
             font-size: 16px;
             line-height: 1.65;
         }
@@ -302,7 +336,7 @@ HTML_TEMPLATE = """
 
         .section-heading h2 {
             margin: 0;
-            color: #1d2b45;
+            color: var(--card-fg);
             font-size: 17px;
             font-weight: 700;
             letter-spacing: -.02em;
@@ -310,7 +344,7 @@ HTML_TEMPLATE = """
 
         .section-heading p {
             margin: 4px 0 0;
-            color: var(--muted);
+            color: var(--muted-fg);
             font-size: 13px;
         }
 
@@ -321,7 +355,7 @@ HTML_TEMPLATE = """
             align-items: center;
             gap: 9px;
             margin-bottom: 11px;
-            color: #34445e;
+            color: var(--card-fg);
             font-size: 13px;
             font-weight: 650;
         }
@@ -331,7 +365,7 @@ HTML_TEMPLATE = """
             width: 23px;
             height: 23px;
             place-items: center;
-            color: #42669f;
+            color: var(--accent-color);
             border: 1px solid rgba(88, 127, 190, .16);
             border-radius: 50%;
             background: rgba(224, 235, 252, .75);
@@ -343,10 +377,10 @@ HTML_TEMPLATE = """
             width: 100%;
             min-height: 58px;
             padding: 10px 12px;
-            color: #53637c;
-            border: 1px solid rgba(104, 128, 166, .2);
+            color: var(--card-fg);
+            border: 1px solid var(--border);
             border-radius: 15px;
-            background: rgba(255,255,255,.58);
+            background: var(--glass);
             font-size: 13px;
         }
 
@@ -354,10 +388,10 @@ HTML_TEMPLATE = """
             min-height: 36px;
             margin: 0 12px 0 0;
             padding: 0 13px;
-            color: #315a9f;
-            border: 1px solid rgba(80, 119, 185, .19);
+            color: var(--accent-color);
+            border: 1px solid var(--border);
             border-radius: 10px;
-            background: rgba(229, 238, 253, .86);
+            background: var(--muted);
             font: inherit;
             font-weight: 650;
             cursor: pointer;
@@ -365,19 +399,19 @@ HTML_TEMPLATE = """
         }
 
         .file-control::file-selector-button:hover {
-            border-color: rgba(80, 119, 185, .34);
-            background: #dce9fc;
+            border-color: var(--accent-color);
+            background: var(--glass);
         }
 
-        .field-hint { margin: 8px 0 0; color: #718099; font-size: 12px; }
+        .field-hint { margin: 8px 0 0; color: var(--muted-fg); font-size: 12px; }
 
         .language-grid {
             max-height: 600px;
             overflow-y: auto;
             padding: 12px;
-            border: 1px solid rgba(104, 128, 166, .15);
+            border: 1px solid var(--border);
             border-radius: 17px;
-            background: rgba(241, 245, 252, .58);
+            background: var(--glass);
             scrollbar-color: #c2cfe3 transparent;
             scrollbar-width: thin;
         }
@@ -395,8 +429,8 @@ HTML_TEMPLATE = """
         }
 
         .language-option:hover {
-            border-color: rgba(104, 128, 166, .11);
-            background: rgba(255,255,255,.7);
+            border-color: var(--border);
+            background: rgba(255,255,255,.12);
         }
 
         .language-option .form-check-input {
@@ -404,22 +438,23 @@ HTML_TEMPLATE = """
             width: 17px;
             height: 17px;
             margin: 0;
-            border-color: #aab8cd;
+            border-color: var(--border);
             cursor: pointer;
+            accent-color: var(--accent-color);
         }
 
         .language-option .form-check-input:checked {
-            border-color: var(--accent);
-            background-color: var(--accent);
+            border-color: var(--accent-color);
+            background-color: var(--accent-color);
         }
 
         .language-option .form-check-label {
-            color: #33435c;
+            color: var(--card-fg);
             font-size: 13px;
             cursor: pointer;
         }
 
-        .language-code { color: #8491a5; font-size: 11px; }
+        .language-code { color: var(--muted-fg); font-size: 11px; }
 
         .btn-translate {
             display: flex;
@@ -427,11 +462,11 @@ HTML_TEMPLATE = """
             align-items: center;
             justify-content: center;
             gap: 10px;
-            color: #fff;
+            color: var(--on-accent);
             border: 1px solid rgba(255,255,255,.32);
             border-radius: 15px;
-            background: linear-gradient(135deg, #3979ed, #245bd0);
-            box-shadow: 0 10px 23px rgba(38, 94, 207, .25), inset 0 1px 0 rgba(255,255,255,.28);
+            background: linear-gradient(135deg, #22C55E, #16A34A);
+            box-shadow: 0 10px 23px rgba(34, 197, 94, .25), inset 0 1px 0 rgba(255,255,255,.28);
             font-size: 14px;
             font-weight: 680;
             letter-spacing: .005em;
@@ -439,108 +474,155 @@ HTML_TEMPLATE = """
         }
 
         .btn-translate:hover {
-            color: #fff;
-            background: linear-gradient(135deg, #2e6fe2, #1d50bd);
-            box-shadow: 0 13px 28px rgba(38, 94, 207, .3), inset 0 1px 0 rgba(255,255,255,.28);
+            color: var(--on-accent);
+            background: linear-gradient(135deg, #4ADE80, #15803D);
+            box-shadow: 0 13px 28px rgba(34, 197, 94, .3), inset 0 1px 0 rgba(255,255,255,.28);
             transform: translateY(-1px);
         }
 
         .btn-translate:active { transform: translateY(0); }
 
         :root[data-theme="dark"] h1,
-        :root[data-theme="dark"] .section-heading h2 { color: #edf3ff; }
+        :root[data-theme="dark"] .section-heading h2 { color: var(--card-fg); }
 
         :root[data-theme="dark"] .intro p,
         :root[data-theme="dark"] .section-heading p,
         :root[data-theme="dark"] .field-hint,
-        :root[data-theme="dark"] .empty-state { color: #b0bdd2; }
+        :root[data-theme="dark"] .empty-state { color: var(--muted-fg); }
 
         :root[data-theme="dark"] .privacy-pill,
         :root[data-theme="dark"] .control-pill {
-            color: #dce6f6;
-            border-color: rgba(174, 193, 224, .2);
-            background: rgba(30, 43, 64, .75);
-            box-shadow: 0 5px 16px rgba(0, 0, 0, .14), inset 0 1px 0 rgba(255,255,255,.06);
+            color: var(--card-fg);
+            border-color: var(--border);
+            background: var(--glass);
+            box-shadow: 0 5px 16px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(255,255,255,.06);
         }
 
-        :root[data-theme="dark"] .language-select { color: #e7edf8; }
-        :root[data-theme="dark"] .language-select option { color: #e7edf8; background: #182133; }
+        :root[data-theme="dark"] .language-select { color: var(--fg); }
+        :root[data-theme="dark"] .language-select option { color: var(--fg); background: var(--muted); }
         :root[data-theme="dark"] .theme-toggle:hover,
-        :root[data-theme="dark"] .language-control:focus-within { background: rgba(55, 73, 103, .85); }
+        :root[data-theme="dark"] .language-control:focus-within { background: rgba(71, 85, 105, .45); }
 
         :root[data-theme="dark"] .glass-panel {
-            box-shadow: 0 24px 70px rgba(0, 0, 0, .25), 0 3px 12px rgba(0, 0, 0, .12), inset 0 1px 0 rgba(255,255,255,.06);
+            box-shadow: 0 24px 70px rgba(0, 0, 0, .35), 0 3px 12px rgba(0, 0, 0, .2), inset 0 1px 0 rgba(255,255,255,.08);
         }
 
         :root[data-theme="dark"] .heading-icon {
-            color: #9dbbff;
-            border-color: rgba(176, 195, 228, .2);
-            background: linear-gradient(145deg, rgba(62, 82, 117, .9), rgba(38, 54, 81, .86));
-            box-shadow: 0 5px 14px rgba(0, 0, 0, .16), inset 0 1px 0 rgba(255,255,255,.08);
+            color: var(--accent-color);
+            border-color: rgba(71, 85, 105, .4);
+            background: linear-gradient(145deg, rgba(30, 41, 59, .9), rgba(15, 23, 38, .86));
+            box-shadow: 0 5px 14px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(255,255,255,.08);
         }
 
         :root[data-theme="dark"] .step-label,
-        :root[data-theme="dark"] .language-option .form-check-label { color: #dce6f6; }
+        :root[data-theme="dark"] .language-option .form-check-label { color: var(--card-fg); }
 
         :root[data-theme="dark"] .step-number {
-            color: #bfd1f1;
-            border-color: rgba(166, 190, 230, .2);
-            background: rgba(56, 76, 108, .7);
+            color: var(--muted-fg);
+            border-color: rgba(71, 85, 105, .3);
+            background: rgba(30, 41, 59, .7);
         }
 
         :root[data-theme="dark"] .file-control,
         :root[data-theme="dark"] .language-grid {
-            color: #dce6f6;
-            border-color: rgba(172, 190, 220, .2);
-            background: rgba(15, 23, 38, .55);
+            color: var(--card-fg);
+            border-color: var(--border);
+            background: var(--muted);
         }
 
         :root[data-theme="dark"] .file-control::file-selector-button {
-            color: #d5e2fb;
-            border-color: rgba(156, 183, 230, .25);
-            background: rgba(55, 75, 110, .7);
+            color: var(--card-fg);
+            border-color: rgba(71, 85, 105, .35);
+            background: rgba(30, 41, 59, .7);
         }
 
         :root[data-theme="dark"] .file-control::file-selector-button:hover,
-        :root[data-theme="dark"] .language-option:hover { background: rgba(66, 87, 124, .4); }
+        :root[data-theme="dark"] .language-option:hover { background: rgba(55, 65, 81, .5); }
 
-        :root[data-theme="dark"] .language-option:hover { border-color: rgba(172, 190, 220, .16); }
-        :root[data-theme="dark"] .language-option .form-check-input { border-color: #9aaac3; background-color: #26344c; }
-        :root[data-theme="dark"] .language-code { color: #9eacc2; }
-        :root[data-theme="dark"] .history-table { --bs-table-color: #dce6f6; --bs-table-hover-color: #f0f5ff; --bs-table-hover-bg: rgba(255,255,255,.05); }
+        :root[data-theme="dark"] .language-option:hover { border-color: rgba(71, 85, 105, .25); }
+        :root[data-theme="dark"] .language-option .form-check-input { border-color: var(--border); background-color: var(--muted); }
+        :root[data-theme="dark"] .language-code { color: var(--muted-fg); }
+        :root[data-theme="dark"] .history-table { --bs-table-color: var(--card-fg); --bs-table-hover-color: #fff; --bs-table-hover-bg: rgba(255,255,255,.05); }
         :root[data-theme="dark"] .history-table thead th,
-        :root[data-theme="dark"] .archive-date { color: #aebbd0; }
-        :root[data-theme="dark"] .archive-name { color: #b8ceff; }
+        :root[data-theme="dark"] .archive-date { color: var(--muted-fg); }
+        :root[data-theme="dark"] .archive-name { color: var(--card-fg); }
         :root[data-theme="dark"] .archive-name i,
-        :root[data-theme="dark"] .empty-icon { color: #a4bcf1; }
+        :root[data-theme="dark"] .empty-icon { color: var(--accent-color); }
         :root[data-theme="dark"] .btn-download {
-            color: #d3e0fa;
-            border-color: rgba(156, 183, 230, .25);
-            background: rgba(42, 57, 82, .7);
+            color: var(--card-fg);
+            border-color: var(--border);
+            background: var(--glass);
         }
         :root[data-theme="dark"] .btn-download:hover {
             color: #fff;
-            border-color: rgba(156, 183, 230, .45);
-            background: rgba(62, 82, 116, .9);
+            border-color: var(--accent-color);
+            background: var(--accent-color);
         }
         :root[data-theme="dark"] .empty-icon {
-            border-color: rgba(172, 190, 220, .17);
-            background: rgba(48, 65, 94, .55);
+            border-color: rgba(71, 85, 105, .25);
+            background: var(--muted);
+        }
+
+        /* Progress bar (shadcn Progress eşdeğeri — ui-ux-pro-max tokenları ile) */
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--muted);
+            overflow: hidden;
+            margin: 10px 0 4px;
+            border: 1px solid var(--border);
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(135deg, var(--accent-color), #16A34A);
+            border-radius: 999px;
+            transition: width .3s ease;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--card-fg);
+            margin-bottom: 2px;
+            letter-spacing: .02em;
+        }
+
+        .progress-status {
+            font-size: 11px;
+            color: var(--muted-fg);
+            margin-bottom: 6px;
+            min-height: 14px;
+        }
+
+        .progress-wrap {
+            display: none;
+            margin-top: 16px;
+            padding: 14px 16px;
+            border: 1px solid var(--border);
+            border-radius: 15px;
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0,0,0,.15);
         }
 
         .history-heading { margin-bottom: 18px; }
 
         .history-table {
             --bs-table-bg: transparent;
-            --bs-table-color: #34445e;
-            --bs-table-hover-bg: rgba(255,255,255,.48);
-            --bs-table-hover-color: #1d2b45;
+            --bs-table-color: var(--card-fg);
+            --bs-table-hover-bg: rgba(255,255,255,.12);
+            --bs-table-hover-color: var(--fg);
             margin: 0;
         }
 
         .history-table thead th {
             padding: 11px 12px;
-            color: #7a879b;
+            color: var(--muted-fg);
             border-bottom: 1px solid var(--line);
             font-size: 11px;
             font-weight: 700;
@@ -552,28 +634,29 @@ HTML_TEMPLATE = """
             padding: 14px 12px;
             border-color: var(--line);
             font-size: 13px;
+            color: var(--card-fg);
         }
 
         .archive-name {
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            color: #315b9d;
+            color: var(--accent-color);
             font-weight: 620;
             overflow-wrap: anywhere;
         }
 
-        .archive-name i { color: #668bc7; }
+        .archive-name i { color: var(--muted-fg); }
 
-        .archive-date { color: #738198; white-space: nowrap; }
+        .archive-date { color: var(--muted-fg); white-space: nowrap; }
 
         .btn-download {
             min-height: 36px;
             padding: 6px 12px;
-            color: #315a9f;
-            border: 1px solid rgba(80, 119, 185, .22);
+            color: var(--card-fg);
+            border: 1px solid var(--border);
             border-radius: 10px;
-            background: rgba(255,255,255,.55);
+            background: var(--glass);
             font-size: 12px;
             font-weight: 620;
             white-space: nowrap;
@@ -581,14 +664,14 @@ HTML_TEMPLATE = """
         }
 
         .btn-download:hover {
-            color: #214c91;
-            border-color: rgba(80, 119, 185, .38);
-            background: rgba(255,255,255,.9);
+            color: #fff;
+            border-color: var(--accent-color);
+            background: var(--accent-color);
         }
 
         .empty-state {
             padding: 28px 16px 14px;
-            color: #6d7b91;
+            color: var(--muted-fg);
             text-align: center;
             font-size: 13px;
             line-height: 1.6;
@@ -600,10 +683,10 @@ HTML_TEMPLATE = """
             height: 44px;
             margin: 0 auto 12px;
             place-items: center;
-            color: #7893bd;
-            border: 1px solid rgba(112, 142, 189, .14);
+            color: var(--muted-fg);
+            border: 1px solid var(--border);
             border-radius: 15px;
-            background: rgba(237, 243, 252, .8);
+            background: var(--muted);
         }
 
         :focus-visible {
@@ -708,7 +791,18 @@ HTML_TEMPLATE = """
                     </div>
                 </fieldset>
 
-                <button type="submit" class="btn btn-translate w-100">
+                <div class="progress-wrap" id="progress-wrap">
+                    <div class="progress-status" id="progress-status" data-i18n="progressPreparing">Dosya hazırlanıyor…</div>
+                    <div class="progress-label">
+                        <span id="progress-label" data-i18n="progressUpload">Yükleniyor</span>
+                        <span id="progress-percent">0%</span>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-translate w-100" id="translate-btn">
                     <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
                     <span data-i18n="submit">Çeviriyi başlat ve arşivi indir</span>
                 </button>
@@ -770,6 +864,10 @@ HTML_TEMPLATE = """
                 recent: "Son çeviriler", recentHint: "Bu oturuma ait arşivleriniz.",
                 archive: "Arşiv adı", date: "Tarih", action: "İşlem", download: "İndir",
                 emptyHistory: "Bu oturuma ait bir arşiv henüz yok.<br>İlk çeviriniz tamamlandığında burada görünecek.",
+                progressPreparing: "Dosya hazırlanıyor…",
+                progressUpload: "Yükleniyor",
+                progressTranslating: "Çeviriliyor…",
+                progressFinishing: "Arşivi hazırlıyor…",
                 targets: { en: "İngilizce", ar: "Arapça", de: "Almanca", es: "İspanyolca", fr: "Fransızca", ja: "Japonca", ko: "Korece", nl: "Felemenkçe", pl: "Lehçe", pt: "Portekizce", zh: "Çince", "zh-TW": "Geleneksel Çince", tr: "Türkçe", it: "İtalyanca", ru: "Rusça" }
             },
             en: {
@@ -784,6 +882,10 @@ HTML_TEMPLATE = """
                 recent: "Recent translations", recentHint: "Your archives from this session.",
                 archive: "Archive", date: "Date", action: "Action", download: "Download",
                 emptyHistory: "There are no archives in this session yet.<br>Your first translation will appear here.",
+                progressPreparing: "Preparing files…",
+                progressUpload: "Uploading",
+                progressTranslating: "Translating…",
+                progressFinishing: "Preparing archive…",
                 targets: { en: "English", ar: "Arabic", de: "German", es: "Spanish", fr: "French", ja: "Japanese", ko: "Korean", nl: "Dutch", pl: "Polish", pt: "Portuguese", zh: "Chinese", "zh-TW": "Traditional Chinese", tr: "Turkish", it: "Italian", ru: "Russian" }
             },
             de: {
@@ -826,6 +928,10 @@ HTML_TEMPLATE = """
                 recent: "Traducciones recientes", recentHint: "Tus archivos de esta sesión.",
                 archive: "Archivo", date: "Fecha", action: "Acción", download: "Descargar",
                 emptyHistory: "Aún no hay archivos en esta sesión.<br>Tu primera traducción aparecerá aquí.",
+                progressPreparing: "Preparando archivos…",
+                progressUpload: "Subiendo",
+                progressTranslating: "Traduciendo…",
+                progressFinishing: "Preparando archivo…",
                 targets: { en: "Inglés", ar: "Árabe", de: "Alemán", es: "Español", fr: "Francés", ja: "Japonés", ko: "Coreano", nl: "Neerlandés", pl: "Polaco", pt: "Portugués", zh: "Chino", "zh-TW": "Chino tradicional", tr: "Turco", it: "Italiano", ru: "Ruso" }
             },
             pl: {
@@ -840,6 +946,10 @@ HTML_TEMPLATE = """
                 recent: "Ostatnie tłumaczenia", recentHint: "Archiwa z tej sesji.",
                 archive: "Archiwum", date: "Data", action: "Akcja", download: "Pobierz",
                 emptyHistory: "W tej sesji nie ma jeszcze archiwów.<br>Pierwsze tłumaczenie pojawi się tutaj.",
+                progressPreparing: "Przygotowywanie plików…",
+                progressUpload: "Wgrywanie",
+                progressTranslating: "Tłumaczenie…",
+                progressFinishing: "Przygotowywanie archiwum…",
                 targets: { en: "Angielski", ar: "Arabski", de: "Niemiecki", es: "Hiszpański", fr: "Francuski", ja: "Japoński", ko: "Koreański", nl: "Niderlandzki", pl: "Polski", pt: "Portugalski", zh: "Chiński", "zh-TW": "Chiński tradycyjny", tr: "Turecki", it: "Włoski", ru: "Rosyjski" }
             },
             pt: {
@@ -854,6 +964,10 @@ HTML_TEMPLATE = """
                 recent: "Traduções recentes", recentHint: "Seus arquivos desta sessão.",
                 archive: "Arquivo", date: "Data", action: "Ação", download: "Baixar",
                 emptyHistory: "Ainda não há arquivos nesta sessão.<br>Sua primeira tradução aparecerá aqui.",
+                progressPreparing: "Preparando arquivos…",
+                progressUpload: "Enviando",
+                progressTranslating: "Traduzindo…",
+                progressFinishing: "Preparando arquivo…",
                 targets: { en: "Inglês", ar: "Árabe", de: "Alemão", es: "Espanhol", fr: "Francês", ja: "Japonês", ko: "Coreano", nl: "Holandês", pl: "Polonês", pt: "Português", zh: "Chinês", "zh-TW": "Chinês tradicional", tr: "Turco", it: "Italiano", ru: "Russo" }
             },
             ja: {
@@ -868,6 +982,10 @@ HTML_TEMPLATE = """
                 recent: "最近の翻訳", recentHint: "このセッションのアーカイブ",
                 archive: "アーカイブ", date: "日付", action: "操作", download: "ダウンロード",
                 emptyHistory: "このセッションにはまだアーカイブがありません。<br>最初の翻訳が完了すると、ここに表示されます。",
+                progressPreparing: "ファイルを準備しています…",
+                progressUpload: "アップロード中",
+                progressTranslating: "翻訳中…",
+                progressFinishing: "アーカイブを準備中…",
                 targets: { en: "英語", ar: "アラビア語", de: "ドイツ語", es: "スペイン語", fr: "フランス語", ja: "日本語", ko: "韓国語", nl: "オランダ語", pl: "ポーランド語", pt: "ポルトガル語", zh: "中国語", "zh-TW": "繁体字中国語", tr: "トルコ語", it: "イタリア語", ru: "ロシア語" }
             },
             "zh-TW": {
@@ -882,6 +1000,10 @@ HTML_TEMPLATE = """
                 recent: "最近的翻譯", recentHint: "此工作階段的封存檔。",
                 archive: "封存檔", date: "日期", action: "操作", download: "下載",
                 emptyHistory: "此工作階段目前沒有封存檔。<br>完成第一次翻譯後，檔案會顯示在這裡。",
+                progressPreparing: "正在準備檔案…",
+                progressUpload: "上傳中",
+                progressTranslating: "正在翻譯…",
+                progressFinishing: "正在準備封存檔…",
                 targets: { en: "英文", ar: "阿拉伯文", de: "德文", es: "西班牙文", fr: "法文", ja: "日文", ko: "韓文", nl: "荷蘭文", pl: "波蘭文", pt: "葡萄牙文", zh: "簡體中文", "zh-TW": "繁體中文", tr: "土耳其文", it: "義大利文", ru: "俄文" }
             }
         };
@@ -953,6 +1075,84 @@ HTML_TEMPLATE = """
         });
 
         setLanguage(initialLanguage());
+
+        /* Progress bar — dosya yükleme/çeviri simülasyonu (10 saniye) */
+        (function () {
+            const form = document.querySelector('form[action="/translate"]');
+            const btn = document.getElementById("translate-btn");
+            const wrap = document.getElementById("progress-wrap");
+            const bar = document.getElementById("progress-bar");
+            const pct = document.getElementById("progress-percent");
+            const status = document.getElementById("progress-status");
+            const label = document.getElementById("progress-label");
+            if (!form || !btn) return;
+
+            const TOTAL_MS = 10000;
+            const STEPS = 40;
+            const stepMs = TOTAL_MS / STEPS;
+
+            const phases = [
+                { pct: 0, labelKey: "progressUpload",   statusKey: "progressPreparing",   endMs: 1500 },
+                { pct: 30, labelKey: "progressUpload",  statusKey: "progressUpload",      endMs: 4000 },
+                { pct: 55, labelKey: "progressTranslating", statusKey: "progressTranslating", endMs: 8500 },
+                { pct: 95, labelKey: "progressFinishing", statusKey: "progressFinishing",   endMs: TOTAL_MS }
+            ];
+
+            function setTextByKey(el, key) {
+                const cur = translations[languageSelect.value] || translations.tr;
+                el.textContent = cur[key] || key;
+            }
+
+            let start = null;
+            let rafId = null;
+            let submitted = false;
+
+            function animate(ts) {
+                if (!start) start = ts;
+                const elapsed = ts - start;
+                const phase = phases.find((p) => elapsed < p.endMs) || phases[phases.length - 1];
+                const prev = phases.find((p) => p.endMs <= (phase === phases[0] ? 0 : phase.endMs - stepMs * 2)) || { pct: 0 };
+
+                // smooth progress toward the phase target within its window
+                const phaseStart = phases.indexOf(phase) === 0 ? 0 : phases[phases.indexOf(phase) - 1].endMs;
+                const phaseEnd = phase.endMs;
+                const t = Math.min(1, Math.max(0, (elapsed - phaseStart) / (phaseEnd - phaseStart)));
+                const startPct = phases.indexOf(phase) === 0 ? 0 : phases[phases.indexOf(phase) - 1].pct;
+                const value = Math.round(startPct + (phase.pct - startPct) * t);
+
+                bar.style.width = value + "%";
+                pct.textContent = value + "%";
+                setTextByKey(label, phase.labelKey);
+                setTextByKey(status, phase.statusKey);
+
+                if (elapsed >= TOTAL_MS && !submitted) {
+                    submitted = true;
+                    wrap.style.display = "none";
+                    bar.style.width = "0%";
+                    btn.disabled = false;
+                    btn.textContent = btn.dataset.label;
+                    form.submit();
+                    return;
+                }
+
+                rafId = requestAnimationFrame(animate);
+            }
+
+            form.addEventListener("submit", function (e) {
+                if (submitted) return;
+                e.preventDefault();
+                btn.dataset.label = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> <span>İşleniyor…</span>';
+                wrap.style.display = "block";
+                bar.style.width = "0%";
+                pct.textContent = "0%";
+                setTextByKey(label, "progressUpload");
+                setTextByKey(status, "progressPreparing");
+                start = null;
+                rafId = requestAnimationFrame(animate);
+            });
+        })();
     </script>
 </body>
 </html>
@@ -1046,4 +1246,4 @@ def download_history(filename):
     return "Unauthorized access or file not found!", 403
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=6161, debug=True)
