@@ -31,7 +31,8 @@
   "progressError": "The translation could not be completed. Please check your connection and try again.",
   "fileLimitHint": "A maximum of 10 JSON files can be selected.",
   "languageLimitHint": "A maximum of 8 target languages can be selected.",
-  "footerText": "© 2026 Holm Open Translate v. 0.1.61 MIT License",
+  "footerText": "© 2026 Holm Open Translate v. 0.1.0 MIT License",
+  "footerHint": "Holm Open Translate is an AI-powered translation tool. It may produce errors, please review the results.",
   "targets": {
     "en": "English",
     "ar": "Arabic",

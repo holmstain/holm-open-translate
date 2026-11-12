@@ -901,6 +901,15 @@ HTML_TEMPLATE = """
             background: var(--muted);
         }
 
+        .site-footer {
+            margin-top: 48px;
+            padding: 22px 0 10px;
+            color: var(--muted-fg);
+            text-align: center;
+            font-size: 12px;
+            border-top: 1px solid var(--border);
+        }
+
         :focus-visible {
             outline: 3px solid rgba(40, 100, 219, .52);
             outline-offset: 3px;
@@ -1250,9 +1259,11 @@ HTML_TEMPLATE = """
                 }
             });
         })();
-        <footer class="site-footer">
-                 <p class="site-footer-text text-center small" data-i18n="footerText">© 2026 Holm Open Translate v. 0.1.61 MIT License</p>
-        </footer>
+    </script>
+    <footer class="site-footer">
+        <p data-i18n="footerText">© 2026 Holm Open Translate v. 0.1.0 MIT License</p>
+        <p data-i18n="footerHint">Holm Open Translate bir yapay zeka çevirisi aracıdır. Bu yapay zeka hata yapabilir, sonucu kontrol edin.</p>
+    </footer>
 </body>
 </html>
 """
