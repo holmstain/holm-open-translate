@@ -444,6 +444,8 @@ HTML_TEMPLATE = """
             cursor: pointer;
         }
 
+        .theme-emoji { font-size: 21px; line-height: 1; }
+
         .theme-toggle:hover, .language-control:focus-within {
             border-color: var(--accent-color);
             background: rgba(255,255,255,.15);
@@ -964,9 +966,9 @@ HTML_TEMPLATE = """
                         <option value="zh-TW">繁體中文</option>
                     </select>
                 </label>
-                <button class="control-pill theme-toggle" id="theme-toggle" type="button" data-i18n="themeDark" aria-pressed="false">
-                    <i class="fa-solid fa-moon" aria-hidden="true"></i>
-                    <span class="visually-hidden" id="theme-label">Koyu tema</span>
+                <button class="control-pill theme-toggle" id="theme-toggle" type="button" aria-label="Koyu temayı aç" aria-pressed="false" title="Koyu temayı aç">
+                    <span class="theme-emoji" id="theme-emoji" aria-hidden="true">🌙</span>
+                    <span class="visually-hidden" id="theme-label">Koyu temayı aç</span>
                 </button>
                 <div class="privacy-pill"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> <span data-i18n="privacy">Kişisel çalışma alanı</span></div>
             </div>
@@ -1093,6 +1095,7 @@ HTML_TEMPLATE = """
         const languageSelect = document.getElementById("interface-language");
         const themeToggle = document.getElementById("theme-toggle");
         const themeLabel = document.getElementById("theme-label");
+        const themeEmoji = document.getElementById("theme-emoji");
         const supportedLanguages = Object.keys(translations);
 
         function initialLanguage() {
@@ -1136,8 +1139,9 @@ HTML_TEMPLATE = """
             const label = darkTheme ? copy.themeLight : copy.themeDark;
             themeToggle.setAttribute("aria-label", label);
             themeToggle.setAttribute("aria-pressed", String(darkTheme));
+            themeToggle.title = label;
             themeLabel.textContent = label;
-            themeToggle.querySelector("i").className = darkTheme ? "fa-solid fa-sun" : "fa-solid fa-moon";
+            themeEmoji.textContent = darkTheme ? "☀️" : "🌙";
             document.querySelector('meta[name="theme-color"]').content = darkTheme ? "#111a2b" : "#eef4ff";
         }
 
