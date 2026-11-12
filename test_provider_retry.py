@@ -18,7 +18,6 @@ http = getattr(_base_client, 'httpx2', None) or _base_client.httpx
 def reset_admission_gate():
     with module.ADMISSION_GATE._lock:
         module.ADMISSION_GATE._cooldown_until = 0.0
-        module.ADMISSION_GATE._emergency_lock = False
         module.ADMISSION_GATE._active = 0
 
 

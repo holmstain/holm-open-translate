@@ -41,11 +41,8 @@ TARGET_LANGUAGES = {
     "sv": "Swedish","th": "Thai","tr": "Turkish","uk": "Ukrainian","vi": "Vietnamese","zh-CN": "Simplified Chinese","zh-TW": "Traditional Chinese","hr": "Croatian",
 }
 
-# Admission gate: shared across every concurrent translation task.
-# - cooldown_until: when a 429/Retry-After is seen the cooldown spreads to all
-#   in-flight and newly arriving translation tasks until it expires.
-# - emergency_lock: a single fail-fast lock. Once set by a terminal provider
-#   error, no new HTTP starts are admitted; existing requests finish then wait.
+# Admission gate and provider slot are shared by translation tasks in this process.
+# The slot prevents a multi-language upload from bursting provider requests.
 # Request limits (managed via constants).
 MAX_UPLOAD_FILES = 10
 MAX_TARGET_LANGUAGES = 8
@@ -55,7 +52,6 @@ class AdmissionGate:
     def __init__(self):
         self._lock = threading.Lock()
         self._cooldown_until = 0.0
-        self._emergency_lock = False
         self._active = 0
 
     def active_count(self):
@@ -67,7 +63,7 @@ class AdmissionGate:
         Returns True when the caller may proceed, False when rejected."""
         with self._lock:
             now = time.monotonic()
-            if self._emergency_lock or now < self._cooldown_until:
+            if now < self._cooldown_until:
                 logger.info(
                     "admission_rejected request_id=%s category=admission status=429 attempt=1 wait=%.1f elapsed=0.0 active=%d",
                     request_id, max(0.0, self._cooldown_until - now), self._active,
@@ -80,29 +76,21 @@ class AdmissionGate:
         with self._lock:
             self._active = max(0, self._active - 1)
 
-    def set_cooldown(self, wait, request_id):
-        """Spread a 429/Retry-After cooldown to all concurrent tasks."""
+    def set_cooldown(self, wait, request_id, status=429):
+        """Prevent new starts until the bounded or provider-directed cooldown expires."""
         with self._lock:
             now = time.monotonic()
             until = now + wait
             if until > self._cooldown_until:
                 self._cooldown_until = until
             logger.info(
-                "admission_cooldown request_id=%s category=http status=429 attempt=1 wait=%.1f elapsed=0.0 active=%d",
-                request_id, wait, self._active,
-            )
-
-    def set_terminal(self, request_id):
-        """Terminal provider error: fail-fast, block new starts."""
-        with self._lock:
-            self._emergency_lock = True
-            logger.info(
-                "admission_terminal request_id=%s category=http status=terminal attempt=1 wait=0.0 elapsed=0.0 active=%d",
-                request_id, self._active,
+                "admission_cooldown request_id=%s category=http status=%s attempt=1 wait=%.1f elapsed=0.0 active=%d",
+                request_id, status, wait, self._active,
             )
 
 
 ADMISSION_GATE = AdmissionGate()
+PROVIDER_SLOT = threading.Lock()
 
 # Load UI locale bundles from locales/*.json for template rendering.
 LOCALES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "locales")
@@ -148,12 +136,16 @@ class TransientTranslationError(TranslationError):
 
 
 def provider_completion(request_id, **kwargs):
+    # Keep retry waits inside the slot so another task cannot bypass backoff.
+    with PROVIDER_SLOT:
+        return _provider_completion_serialized(request_id, **kwargs)
+
+
+def _provider_completion_serialized(request_id, **kwargs):
     """Retry only the current provider call; SDK retries stay disabled.
 
-    Admission gate: a 429/Retry-After spreads a cooldown to every concurrent
-    translation task and trips the single emergency fail-fast lock. A terminal
-    provider error trips the emergency lock so no new HTTP starts are admitted;
-    in-flight requests finish then wait.
+    A long Retry-After or exhausted 429 creates a bounded cooldown. Provider
+    failures never disable later requests permanently.
     """
     start = time.monotonic()
     for attempt in range(1, 4):
@@ -166,9 +158,8 @@ def provider_completion(request_id, **kwargs):
             status = exc.status_code if isinstance(exc, APIStatusError) else None
             elapsed = time.monotonic() - start
             if status is not None and status not in {429, 500, 502, 503, 504}:
-                # Terminal provider error: fail-fast, block new starts.
-                ADMISSION_GATE.set_terminal(request_id)
                 log_request(request_id, "http", status, attempt, 0.0, elapsed)
+                category = "http"
                 logger.warning(
                     "Terminal provider error category=%s status=%s attempt=%d",
                     category, status, attempt,
@@ -193,10 +184,7 @@ def provider_completion(request_id, **kwargs):
                     wait = 0.0
             if wait > 5:
                 # Long server-directed delay: do not retry early.
-                if status == 429:
-                    ADMISSION_GATE.set_cooldown(wait, request_id)
-                else:
-                    ADMISSION_GATE.set_terminal(request_id)
+                ADMISSION_GATE.set_cooldown(wait, request_id, status)
                 log_request(request_id, category, status, attempt, wait, elapsed)
                 logger.warning(
                     "Temporary provider failure category=%s status=%s attempt=%d/3 wait=%.1f",
@@ -204,10 +192,8 @@ def provider_completion(request_id, **kwargs):
                 )
                 raise TransientTranslationError() from None
             if attempt == 3:
-                if status == 429 and wait > 0:
-                    ADMISSION_GATE.set_cooldown(wait, request_id)
-                else:
-                    ADMISSION_GATE.set_terminal(request_id)
+                if status == 429:
+                    ADMISSION_GATE.set_cooldown(wait or 5.0, request_id, status)
                 log_request(request_id, category, status, attempt, wait, elapsed)
                 logger.warning(
                     "Temporary provider failure category=%s status=%s attempt=%d/3",

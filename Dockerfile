@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir Flask==3.1.0 openai==1.99.5 python-dotenv==1.1.0 
 # Copy only runtime files so a local .env never enters the image.
 COPY app.py .
 COPY assets/ ./assets/
+COPY locales/ ./locales/
 
 EXPOSE 5000
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "120", "app:app"]

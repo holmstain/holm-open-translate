@@ -34,7 +34,6 @@ class TranslationFlowTests(unittest.TestCase):
         self.client = module.app.test_client()
         with module.ADMISSION_GATE._lock:
             module.ADMISSION_GATE._cooldown_until = 0.0
-            module.ADMISSION_GATE._emergency_lock = False
             module.ADMISSION_GATE._active = 0
 
     def upload(self, value=b'{"hello":"Hello"}', targets=None, source="en", filename="common.json"):

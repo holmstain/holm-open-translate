@@ -17,6 +17,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.github/
+.venv/
 
 # OS specific files
 .DS_Store

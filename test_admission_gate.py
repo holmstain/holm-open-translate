@@ -4,6 +4,7 @@ import json
 import os
 import socket
 import tempfile
+import threading
 import unittest
 import zipfile
 from unittest.mock import patch
@@ -17,7 +18,6 @@ http = getattr(_base_client, 'httpx2', None) or _base_client.httpx
 def reset_gate():
     with module.ADMISSION_GATE._lock:
         module.ADMISSION_GATE._cooldown_until = 0.0
-        module.ADMISSION_GATE._emergency_lock = False
         module.ADMISSION_GATE._active = 0
 
 
@@ -41,13 +41,6 @@ class AdmissionGateUnitTests(unittest.TestCase):
         gate.set_cooldown(10, "req-1")
         self.assertFalse(gate.admit("req-2"))
         self.assertEqual(gate.active_count(), 0)
-
-    def test_terminal_lock_blocks_new_admits(self):
-        gate = module.ADMISSION_GATE
-        gate.set_terminal("req-1")
-        self.assertFalse(gate.admit("req-2"))
-        self.assertEqual(gate.active_count(), 0)
-
 
 class AdmissionGateFlowTests(unittest.TestCase):
     upload = flow.TranslationFlowTests.upload
@@ -74,8 +67,8 @@ class AdmissionGateFlowTests(unittest.TestCase):
                 payload = {'id': 'offline', 'object': 'chat.completion', 'created': 0, 'model': module.MODEL_NAME,
                     'choices': [{'index': 0, 'message': {
                         'role': 'assistant',
-                        'content': text.get('text') if isinstance(text, dict) else text,
-                        'finish_reason': text.get('reason', 'stop') if isinstance(text, dict) else 'stop'}}]}
+                        'content': text.get('text') if isinstance(text, dict) else text},
+                        'finish_reason': text.get('reason', 'stop') if isinstance(text, dict) else 'stop'}]}
             else:
                 payload = {'error': {'message': 'synthetic private provider payload', 'type': 'upstream', 'code': None}}
             return http.Response(status, json=payload, headers=headers)
@@ -87,27 +80,59 @@ class AdmissionGateFlowTests(unittest.TestCase):
         replacement.start()
         self.addCleanup(replacement.stop)
 
-    def test_429_long_retry_after_trips_emergency_lock_and_blocks_new_starts(self):
-        # 429 with retry-after 100 -> cooldown + emergency lock -> 502, no retry
-        self.use_provider([(429, '', {'retry-after': '100'})])
+    def test_429_long_retry_after_blocks_starts_only_during_cooldown(self):
+        # Do not retry before the provider's 100-second wait expires.
+        self.use_provider([(429, '', {'retry-after': '100'}), (200, 'Merhaba', {})])
         result = self.upload()
         self.assertEqual(result.status_code, 502)
         self.assertEqual(len(self.requests), 1)
-        # Emergency lock active: a second request is blocked without calling the provider
+        # Cooldown active: a second request is blocked without calling the provider.
         result2 = self.upload()
         self.assertEqual(result2.status_code, 502)
         self.assertEqual(len(self.requests), 1)
+        with module.ADMISSION_GATE._lock:
+            module.ADMISSION_GATE._cooldown_until = 0.0  # Simulate elapsed cooldown.
+        self.assertEqual(self.upload().status_code, 200)
+        self.assertEqual(len(self.requests), 2)
 
-    def test_terminal_error_blocks_new_starts_fail_fast(self):
-        # A terminal (non-allowlisted) status trips the emergency lock
-        self.use_provider([(401, '', {'x-should-retry': 'true'})])
+    def test_exhausted_429_without_retry_after_does_not_disable_later_upload(self):
+        self.use_provider([(429, '', {})] * 3 + [(200, 'Merhaba', {})])
+        self.assertEqual(self.upload().status_code, 502)
+        self.assertEqual(len(self.requests), 3)
+        with module.ADMISSION_GATE._lock:
+            module.ADMISSION_GATE._cooldown_until = 0.0  # Simulate elapsed cooldown.
+        later = self.upload()
+        self.assertEqual(later.status_code, 200)
+        self.assertEqual(len(self.requests), 4)
+
+    def test_multiple_targets_do_not_burst_provider_requests(self):
+        active = 0
+        peak = 0
+        lock = threading.Lock()
+
+        def completion(**_kwargs):
+            nonlocal active, peak
+            with lock:
+                active += 1
+                peak = max(peak, active)
+            threading.Event().wait(0.02)
+            with lock:
+                active -= 1
+            return flow.response()
+
+        with patch.object(module.client.chat.completions, "create", side_effect=completion):
+            result = self.upload(targets=["tr", "de", "fr", "it", "nl", "pl", "ru", "ja"])
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(peak, 1)
+
+    def test_terminal_error_does_not_disable_later_upload(self):
+        self.use_provider([(401, '', {'x-should-retry': 'true'}), (200, 'Merhaba', {})])
         result = self.upload()
         self.assertEqual(result.status_code, 502)
         self.assertEqual(len(self.requests), 1)
-        # Second request blocked without provider call (fail-fast / cancellation)
         result2 = self.upload()
-        self.assertEqual(result2.status_code, 502)
-        self.assertEqual(len(self.requests), 1)
+        self.assertEqual(result2.status_code, 200)
+        self.assertEqual(len(self.requests), 2)
 
     def test_no_sensitive_data_in_logs(self):
         self.use_provider([(429, '', {'retry-after': '100'})])
