@@ -4,11 +4,18 @@ import io
 import zipfile
 import uuid
 import logging
+import re
+import math
+import time
 import threading
-from datetime import datetime
+from email.utils import parsedate_to_datetime
+from collections import Counter
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template_string, request, send_file, make_response
-from openai import OpenAI
+from openai import OpenAI, APIConnectionError, APIStatusError
+from werkzeug.utils import secure_filename
+from pypdf import PdfReader
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,17 +29,90 @@ API_KEY = os.getenv("NVIDIA_API_KEY")
 BASE_URL = "https://integrate.api.nvidia.com/v1"
 MODEL_NAME = "nvidia/riva-translate-4b-instruct-v2"
 
-client = OpenAI(base_url=BASE_URL, api_key=API_KEY, timeout=30.0)
+client = OpenAI(base_url=BASE_URL, api_key=API_KEY or "not-configured", timeout=30.0, max_retries=0)
 
 BASE_OUTPUT_DIR = os.path.join(os.getcwd(), "outputs")
 os.makedirs(BASE_OUTPUT_DIR, exist_ok=True)
 
 TARGET_LANGUAGES = {
-    "ar": "Arabic","bg": "Bulgarian","cs": "Czech","da": "Danish","de": "German","el": "Greek","es-ES": "European Spanish","es-419": "Latin America Spanish","et": "Estonian",
+    "en": "English", "ar": "Arabic","bg": "Bulgarian","cs": "Czech","da": "Danish","de": "German","el": "Greek","es-ES": "European Spanish","es-419": "Latin America Spanish","et": "Estonian",
     "fi": "Finnish","fr": "French","hi": "Hindi","hu": "Hungarian","id": "Indonesian","it": "Italian","ja": "Japanese","ko": "Korean","lt": "Lithuanian","lv": "Latvian",
     "nl": "Dutch","no": "Norwegian","pl": "Polish","pt-PT": "European Portuguese","pt-BR": "Brazil Portuguese","ro": "Romanian","ru": "Russian","sk": "Slovak","sl": "Slovenian",
-    "sv": "Swedish","th": "Thai","tr": "Turkish","uk": "Ukrainian","vi": "Vietnamese","zh-CN": "Simplified Chinese","zh-TW": "Traditional Chinese",
+    "sv": "Swedish","th": "Thai","tr": "Turkish","uk": "Ukrainian","vi": "Vietnamese","zh-CN": "Simplified Chinese","zh-TW": "Traditional Chinese","hr": "Croatian",
 }
+
+# Admission gate: shared across every concurrent translation task.
+# - cooldown_until: when a 429/Retry-After is seen the cooldown spreads to all
+#   in-flight and newly arriving translation tasks until it expires.
+# - emergency_lock: a single fail-fast lock. Once set by a terminal provider
+#   error, no new HTTP starts are admitted; existing requests finish then wait.
+# Request limits (managed via constants).
+MAX_UPLOAD_FILES = 10
+MAX_TARGET_LANGUAGES = 8
+
+
+class AdmissionGate:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._cooldown_until = 0.0
+        self._emergency_lock = False
+        self._active = 0
+
+    def active_count(self):
+        with self._lock:
+            return self._active
+
+    def admit(self, request_id):
+        """Block new starts while cooldown or emergency lock is active.
+        Returns True when the caller may proceed, False when rejected."""
+        with self._lock:
+            now = time.monotonic()
+            if self._emergency_lock or now < self._cooldown_until:
+                logger.info(
+                    "admission_rejected request_id=%s category=admission status=429 attempt=1 wait=%.1f elapsed=0.0 active=%d",
+                    request_id, max(0.0, self._cooldown_until - now), self._active,
+                )
+                return False
+            self._active += 1
+            return True
+
+    def release(self):
+        with self._lock:
+            self._active = max(0, self._active - 1)
+
+    def set_cooldown(self, wait, request_id):
+        """Spread a 429/Retry-After cooldown to all concurrent tasks."""
+        with self._lock:
+            now = time.monotonic()
+            until = now + wait
+            if until > self._cooldown_until:
+                self._cooldown_until = until
+            self._emergency_lock = True
+            logger.info(
+                "admission_cooldown request_id=%s category=http status=429 attempt=1 wait=%.1f elapsed=0.0 active=%d",
+                request_id, wait, self._active,
+            )
+
+    def set_terminal(self, request_id):
+        """Terminal provider error: fail-fast, block new starts."""
+        with self._lock:
+            self._emergency_lock = True
+            logger.info(
+                "admission_terminal request_id=%s category=http status=terminal attempt=1 wait=0.0 elapsed=0.0 active=%d",
+                request_id, self._active,
+            )
+
+
+ADMISSION_GATE = AdmissionGate()
+
+
+def log_request(request_id, category, status, attempt, wait, elapsed):
+    """Request-correlation log. Never logs API keys, source text, or provider payloads."""
+    logger.info(
+        "request_id=%s category=%s status=%s attempt=%d wait=%.2f elapsed=%.2f active=%d",
+        request_id, category, status, attempt, wait, elapsed, ADMISSION_GATE.active_count(),
+    )
+
 
 def get_user_session_id():
     session_id = request.cookies.get("user_session")
@@ -44,45 +124,140 @@ def get_user_session_id():
         pass
     return str(uuid.uuid4())
 
-def translate_text(text, lang_name):
-    if not isinstance(text, str) or not text.strip():
-        return text
+# Public locale codes remain stable in filenames; NVIDIA uses es-us.
+PROVIDER_CODES = {code: code.lower() for code in TARGET_LANGUAGES}
+PROVIDER_CODES["es-419"] = "es-us"
+PLACEHOLDER_PATTERN = re.compile(
+    r"\{\{[^{}]+\}\}|\$\{[^{}]+\}|\{[^{}]+\}|%(?:\([^)]+\)|\d+\$)?[-+#0 ]*(?:\d+|\*)?(?:\.(?:\d+|\*))?[hlL]?[diuoxXfFeEgGcsra%]"
+)
 
-    prompt = f"Translate the following UI text strictly into {lang_name}. Return ONLY the translated text, nothing else:\n\n{text}"
-    completion = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.1,
-        max_tokens=256
-    )
-    translated = completion.choices[0].message.content.strip()
-    return translated if translated else text
 
-def translate_recursive_parallel(data, lang_name, _stats=None, _lock=None):
-    """Recursively translate all string values in JSON, preserving keys and structure.
+class TranslationError(Exception):
+    """The provider did not return a complete, usable translation."""
 
-    _stats: dict with 'failed' and 'total' counters (thread-safe via _lock).
-    _lock: threading.Lock to protect _stats.
+
+class TransientTranslationError(TranslationError):
+    """A temporary upstream failure persisted beyond the bounded retry policy."""
+
+
+def provider_completion(request_id, **kwargs):
+    """Retry only the current provider call; SDK retries stay disabled.
+
+    Admission gate: a 429/Retry-After spreads a cooldown to every concurrent
+    translation task and trips the single emergency fail-fast lock. A terminal
+    provider error trips the emergency lock so no new HTTP starts are admitted;
+    in-flight requests finish then wait.
     """
-    if isinstance(data, dict):
-        return {k: translate_recursive_parallel(v, lang_name, _stats, _lock) for k, v in data.items()}
-    elif isinstance(data, list):
-        return [translate_recursive_parallel(item, lang_name, _stats, _lock) for item in data]
-    elif isinstance(data, str):
-        if _stats is not None and _lock is not None:
-            with _lock:
-                _stats['total'] = _stats.get('total', 0) + 1
+    start = time.monotonic()
+    for attempt in range(1, 4):
+        if not ADMISSION_GATE.admit(request_id):
+            raise TransientTranslationError() from None
         try:
-            return translate_text(data, lang_name)
-        except Exception as exc:
-            # Tek bir string çevrilişemese de diğerlerinin devam etmesi için buraya yakala.
-            logger.error("Çeviri hatası ('%s' -> %s): %s", data[:80], lang_name, exc)
-            if _stats is not None and _lock is not None:
-                with _lock:
-                    _stats['failed'] = _stats.get('failed', 0) + 1
-            return data
-    else:
-        return data
+            result = client.chat.completions.create(**kwargs)
+        except (APIConnectionError, APIStatusError) as exc:
+            ADMISSION_GATE.release()
+            status = exc.status_code if isinstance(exc, APIStatusError) else None
+            elapsed = time.monotonic() - start
+            if status is not None and status not in {429, 500, 502, 503, 504}:
+                # Terminal provider error: fail-fast, block new starts.
+                ADMISSION_GATE.set_terminal(request_id)
+                log_request(request_id, "http", status, attempt, 0.0, elapsed)
+                logger.warning(
+                    "Terminal provider error category=%s status=%s attempt=%d",
+                    category, status, attempt,
+                )
+                raise
+            category = "http" if status is not None else "connection_or_timeout"
+            wait = 0.0
+            if isinstance(exc, APIStatusError):
+                retry_after = exc.response.headers.get("retry-after")
+                if retry_after is not None:
+                    try:
+                        wait = float(retry_after)
+                    except ValueError:
+                        try:
+                            date = parsedate_to_datetime(retry_after)
+                            if date.tzinfo is None:
+                                date = date.replace(tzinfo=timezone.utc)
+                            wait = (date - datetime.now(timezone.utc)).total_seconds()
+                        except (TypeError, ValueError, OverflowError):
+                            wait = 0.0
+                if not (math.isfinite(wait) and wait >= 0):
+                    wait = 0.0
+            if wait > 5:
+                # Long server-directed delay: do not retry early.
+                if status == 429:
+                    ADMISSION_GATE.set_cooldown(wait, request_id)
+                else:
+                    ADMISSION_GATE.set_terminal(request_id)
+                log_request(request_id, category, status, attempt, wait, elapsed)
+                logger.warning(
+                    "Temporary provider failure category=%s status=%s attempt=%d/3 wait=%.1f",
+                    category, status, attempt, wait,
+                )
+                raise TransientTranslationError() from None
+            if attempt == 3:
+                if status == 429 and wait > 0:
+                    ADMISSION_GATE.set_cooldown(wait, request_id)
+                else:
+                    ADMISSION_GATE.set_terminal(request_id)
+                log_request(request_id, category, status, attempt, wait, elapsed)
+                logger.warning(
+                    "Temporary provider failure category=%s status=%s attempt=%d/3",
+                    category, status, attempt,
+                )
+                raise TransientTranslationError() from None
+            delay = wait or (0.5 * (2 ** (attempt - 1)))
+            log_request(request_id, category, status, attempt, delay, elapsed)
+            logger.warning(
+                "Temporary provider failure category=%s status=%s attempt=%d/3",
+                category, status, attempt,
+            )
+            time.sleep(delay)
+        except Exception:
+            ADMISSION_GATE.release()
+            raise
+        else:
+            ADMISSION_GATE.release()
+            return result
+
+
+def translate_text(text, target_language, source_language="en", request_id=None):
+    if source_language == target_language or not isinstance(text, str) or not text.strip():
+        return text
+    if source_language != "en" and target_language != "en":
+        intermediate = translate_text(text, "en", source_language, request_id)
+        return translate_text(intermediate, target_language, "en", request_id)
+    if request_id is None:
+        request_id = str(uuid.uuid4())
+    completion = provider_completion(
+        request_id,
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": f"{PROVIDER_CODES[source_language]}-{PROVIDER_CODES[target_language]}"},
+            {"role": "user", "content": text},
+        ],
+        temperature=0.0,
+        max_tokens=4096,
+    )
+    choice = completion.choices[0]
+    translated = choice.message.content
+    if choice.finish_reason != "stop" or not isinstance(translated, str) or not translated.strip():
+        raise TranslationError("Provider returned an incomplete or empty translation")
+    if Counter(PLACEHOLDER_PATTERN.findall(text)) != Counter(PLACEHOLDER_PATTERN.findall(translated)):
+        raise TranslationError("Provider changed localization placeholders")
+    return translated.strip()
+
+
+def translate_recursive_parallel(data, target_language, source_language="en", request_id=None):
+    """Translate JSON string values; preserve keys, containers and scalar types."""
+    if isinstance(data, dict):
+        return {k: translate_recursive_parallel(v, target_language, source_language, request_id) for k, v in data.items()}
+    if isinstance(data, list):
+        return [translate_recursive_parallel(v, target_language, source_language, request_id) for v in data]
+    if isinstance(data, str):
+        return translate_text(data, target_language, source_language, request_id)
+    return data
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -115,28 +290,28 @@ HTML_TEMPLATE = """
     <style>
         :root {
             color-scheme: light;
-            --bg: #0F172A;
-            --fg: #F8FAFC;
+            --bg: #F8FAFC;
+            --fg: #0F172A;
             --primary: #1E293B;
             --on-primary: #FFFFFF;
-            --secondary: #334155;
+            --secondary: #475569;
             --on-secondary: #FFFFFF;
             --accent: #22C55E;
             --on-accent: #0F172A;
-            --card: #1B2336;
-            --card-fg: #F8FAFC;
-            --muted: #272F42;
-            --muted-fg: #94A3B8;
-            --border: #475569;
+            --card: #FFFFFF;
+            --card-fg: #0F172A;
+            --muted: #F1F5F9;
+            --muted-fg: #64748B;
+            --border: #E2E8F0;
             --destructive: #EF4444;
-            --on-destructive: #000000;
-            --ring: #FFFFFF;
+            --on-destructive: #FFFFFF;
+            --ring: #22C55E;
             --ink: var(--fg);
             --muted-text: var(--muted-fg);
             --accent-color: var(--accent);
-            --glass: rgba(27, 35, 54, 0.72);
-            --glass-border: rgba(71, 85, 105, 0.48);
-            --line: rgba(71, 85, 105, 0.28);
+            --glass: rgba(255,255,255,0.72);
+            --glass-border: rgba(71,85,105,0.20);
+            --line: rgba(71,85,105,0.12);
         }
 
         :root[data-theme="dark"] {
@@ -760,7 +935,7 @@ HTML_TEMPLATE = """
     <main class="container app-shell">
         <header class="topbar">
             <div class="brand">
-                <img class="brand-logo" src="{{ url_for('static', filename='holm-translate-logo.png') }}" alt="">
+                <img class="brand-logo" src="{{ url_for('static', filename='holm-translate-logo.png') }}" alt="Holm Open Translate logo">
                 <span>Holm Open Translate</span>
             </div>
             <div class="topbar-controls">
@@ -807,14 +982,26 @@ HTML_TEMPLATE = """
                     <label class="step-label" for="json-files">
                         <span class="step-number">1</span> <span data-i18n="stepFiles">JSON dosyalarını ekleyin</span>
                     </label>
-                    <input class="form-control file-control" id="json-files" type="file" name="files" multiple accept=".json" aria-describedby="file-hint" required>
+                    <input class="form-control file-control" id="json-files" type="file" name="files" multiple accept=".json" aria-describedby="file-hint file-limit-hint" required>
                     <p class="field-hint" id="file-hint" data-i18n="fileHint">Bir veya daha fazla .json dosyası seçebilirsiniz.</p>
+                    <p class="field-hint" id="file-limit-hint">En fazla 10 JSON dosyası seçilebilir.</p>
+                </div>
+
+                <div class="step-block">
+                    <label class="step-label" for="source-language" data-i18n="sourceLanguage">Kaynak dil</label>
+                    <select class="form-select file-control" id="source-language" name="source_language" aria-describedby="source-hint">
+                        {% for code, name in languages.items() %}
+                        <option value="{{ code }}" {% if code == 'en' %}selected{% endif %}>{{ name }} ({{ code }})</option>
+                        {% endfor %}
+                    </select>
+                    <p class="field-hint" id="source-hint" data-i18n="sourceHint">Dosyanın gerçek dilini seçin. Tüm listelenen dil çiftleri desteklenir. İngilizce dışındaki çiftler İngilizce üzerinden iki adımda çevrilir; süre ve API kullanımı artabilir. Otomatik dil algılama yoktur.</p>
                 </div>
 
                 <fieldset class="step-block border-0 p-0">
                     <legend class="step-label">
                         <span class="step-number">2</span> <span data-i18n="stepLanguages">Hedef dilleri seçin</span>
                     </legend>
+                    <p class="field-hint" id="language-limit-hint">En fazla 8 hedef dil seçilebilir.</p>
                     <div class="row g-1 language-grid">
                         {% for code, name in languages.items() %}
                         <div class="col-6 col-sm-4">
@@ -827,7 +1014,7 @@ HTML_TEMPLATE = """
                     </div>
                 </fieldset>
 
-                <div class="progress-wrap" id="progress-wrap">
+                <div class="progress-wrap" id="progress-wrap" role="alert" aria-live="polite" tabindex="-1">
                     <div class="progress-status" id="progress-status" data-i18n="progressPreparing">Dosya hazırlanıyor…</div>
                     <div class="progress-label">
                         <span id="progress-label" data-i18n="progressUpload">Yükleniyor</span>
@@ -1061,6 +1248,17 @@ HTML_TEMPLATE = """
             }
         };
 
+        Object.assign(translations.tr, {
+            sourceLanguage: "Kaynak dil", sourceHint: "Dosyanın gerçek dilini seçin. Tüm listelenen dil çiftleri desteklenir. İngilizce dışındaki çiftler İngilizce üzerinden iki adımda çevrilir; süre ve API kullanımı artabilir. Otomatik dil algılama yoktur.",
+            progressWaiting: "Çeviri sürüyor. Dosya boyutuna göre birkaç dakika sürebilir; bu sayfayı açık tutun.",
+            progressError: "Çeviri tamamlanamadı. Bağlantınızı kontrol edip yeniden deneyin."
+        });
+        Object.assign(translations.en, {
+            sourceLanguage: "Source language", sourceHint: "Select the actual file language. All listed language pairs are supported. Pairs without English translate through English in two steps, which may increase time and API use. Language detection is not automatic.",
+            progressWaiting: "Translation in progress. Large files may take several minutes; keep this page open.",
+            progressError: "Translation could not finish. Check your connection and try again."
+        });
+
         const languageSelect = document.getElementById("interface-language");
         const themeToggle = document.getElementById("theme-toggle");
         const themeLabel = document.getElementById("theme-label");
@@ -1086,7 +1284,7 @@ HTML_TEMPLATE = """
             document.documentElement.lang = language === "pt" ? "pt" : language;
             document.title = copy.pageTitle;
             document.querySelectorAll("[data-i18n]").forEach((element) => {
-                element.innerHTML = copy[element.dataset.i18n];
+                element.innerHTML = copy[element.dataset.i18n] || translations.en[element.dataset.i18n] || translations.tr[element.dataset.i18n];
             });
             document.querySelectorAll("[data-target-language]").forEach((element) => {
                 const name = copy.targets[element.dataset.targetLanguage];
@@ -1129,7 +1327,7 @@ HTML_TEMPLATE = """
 
         setLanguage(initialLanguage());
 
-        /* Progress bar — dosya yükleme/çeviri simülasyonu (10 saniye) */
+        /* Request feedback follows the actual response; the server has no percentage API. */
         (function () {
             const form = document.querySelector('form[action="/translate"]');
             const btn = document.getElementById("translate-btn");
@@ -1138,82 +1336,63 @@ HTML_TEMPLATE = """
             const pct = document.getElementById("progress-percent");
             const status = document.getElementById("progress-status");
             const label = document.getElementById("progress-label");
+            const success = document.getElementById("progress-success");
+            const successText = document.getElementById("progress-success-text");
             if (!form || !btn) return;
 
-            const TOTAL_MS = 10000;
-            const STEPS = 40;
-            const stepMs = TOTAL_MS / STEPS;
-
-            const phases = [
-                { pct: 0, labelKey: "progressUpload",   statusKey: "progressPreparing",   endMs: 1500 },
-                { pct: 30, labelKey: "progressUpload",  statusKey: "progressUpload",      endMs: 4000 },
-                { pct: 55, labelKey: "progressTranslating", statusKey: "progressTranslating", endMs: 8500 },
-                { pct: 95, labelKey: "progressFinishing", statusKey: "progressFinishing",   endMs: TOTAL_MS }
-            ];
-
-            function setTextByKey(el, key) {
-                const cur = translations[languageSelect.value] || translations.tr;
-                el.textContent = cur[key] || key;
-            }
-
-            let start = null;
-            let rafId = null;
-            let submitted = false;
-
-            function animate(ts) {
-                if (!start) start = ts;
-                const elapsed = ts - start;
-                const phase = phases.find((p) => elapsed < p.endMs) || phases[phases.length - 1];
-                const prev = phases.find((p) => p.endMs <= (phase === phases[0] ? 0 : phase.endMs - stepMs * 2)) || { pct: 0 };
-
-                // smooth progress toward the phase target within its window
-                const phaseStart = phases.indexOf(phase) === 0 ? 0 : phases[phases.indexOf(phase) - 1].endMs;
-                const phaseEnd = phase.endMs;
-                const t = Math.min(1, Math.max(0, (elapsed - phaseStart) / (phaseEnd - phaseStart)));
-                const startPct = phases.indexOf(phase) === 0 ? 0 : phases[phases.indexOf(phase) - 1].pct;
-                const value = Math.round(startPct + (phase.pct - startPct) * t);
-
-                bar.style.width = value + "%";
-                pct.textContent = value + "%";
-                setTextByKey(label, phase.labelKey);
-                setTextByKey(status, phase.statusKey);
-
-                if (elapsed >= TOTAL_MS && !submitted) {
-                    submitted = true;
-                    bar.style.width = "100%";
-                    pct.textContent = "100%";
-                    document.getElementById("progress-status").style.display = "none";
-                    document.getElementById("progress-label").style.display = "none";
-                    document.getElementById("progress-bar").style.display = "none";
-                    const success = document.getElementById("progress-success");
-                    const successText = document.getElementById("progress-success-text");
-                    success.style.display = "flex";
-                    setTextByKey(successText, "progressDone");
-                    setTimeout(() => {
-                        wrap.style.display = "none";
-                        btn.innerHTML = btn.dataset.label;
-                        btn.disabled = false;
-                        form.submit();
-                    }, 1000);
-                    return;
-                }
-
-                rafId = requestAnimationFrame(animate);
-            }
-
-            form.addEventListener("submit", function (e) {
-                if (submitted) return;
-                e.preventDefault();
-                btn.dataset.label = btn.innerHTML;
+            form.addEventListener("submit", async function (event) {
+                event.preventDefault();
+                if (btn.disabled) return;
+                const copy = translations[languageSelect.value] || translations.tr;
+                const originalLabel = btn.innerHTML;
+                const formData = new FormData(form);
                 btn.disabled = true;
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> <span>İşleniyor…</span>';
+                form.setAttribute("aria-busy", "true");
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>';
                 wrap.style.display = "block";
-                bar.style.width = "0%";
-                pct.textContent = "0%";
-                setTextByKey(label, "progressUpload");
-                setTextByKey(status, "progressPreparing");
-                start = null;
-                rafId = requestAnimationFrame(animate);
+                success.style.display = "none";
+                status.style.display = "block";
+                status.textContent = copy.progressWaiting || translations.en.progressWaiting;
+                status.setAttribute("role", "status");
+                label.textContent = copy.progressTranslating;
+                pct.textContent = "";
+                bar.style.display = "none";
+                try {
+                    const response = await fetch(form.action, { method: "POST", body: formData });
+                    if (!response.ok) throw new Error(await response.text());
+                    if (!(response.headers.get("Content-Type") || "").includes("application/zip")) {
+                        throw new Error(copy.progressError || translations.en.progressError);
+                    }
+                    const blob = await response.blob();
+                    const disposition = response.headers.get("Content-Disposition") || "";
+                    const match = disposition.match(/filename="?([^";]+)"?/);
+                    const filename = match ? match[1] : "translations.zip";
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(url);
+                    successText.textContent = copy.progressDone || translations.en.progressDone;
+                    const retryDownload = document.createElement("a");
+                    retryDownload.href = "/download/" + encodeURIComponent(filename);
+                    retryDownload.textContent = " · " + copy.download;
+                    successText.appendChild(retryDownload);
+                    status.style.display = "none";
+                    label.textContent = "";
+                    success.style.display = "flex";
+                } catch (error) {
+                    label.textContent = "";
+                    status.setAttribute("role", "alert");
+                    status.textContent = error.message || copy.progressError || translations.en.progressError;
+                    wrap.focus();
+                } finally {
+                    form.removeAttribute("aria-busy");
+                    btn.disabled = false;
+                    btn.innerHTML = originalLabel;
+                }
             });
         })();
     </script>
@@ -1246,98 +1425,119 @@ def index():
 
 @app.route('/translate', methods=['POST'])
 def translate():
+    request_id = str(uuid.uuid4())
+    log_request(request_id, "request", "started", 1, 0.0, 0.0)
+    uploaded_files = request.files.getlist('files')
+    selected_langs = list(dict.fromkeys(request.form.getlist('languages')))
+    source_language = request.form.get('source_language', 'en')
+    if not uploaded_files or not selected_langs:
+        log_request(request_id, "request", "rejected", 1, 0.0, 0.0)
+        return "Please select at least one JSON file and target language.", 400
+    if len(uploaded_files) > MAX_UPLOAD_FILES:
+        log_request(request_id, "request", "rejected", 1, 0.0, 0.0)
+        return f"En fazla {MAX_UPLOAD_FILES} JSON dosyası seçilebilir.", 400
+    if len(selected_langs) > MAX_TARGET_LANGUAGES:
+        log_request(request_id, "request", "rejected", 1, 0.0, 0.0)
+        return f"En fazla {MAX_TARGET_LANGUAGES} hedef dil seçilebilir.", 400
+    if source_language not in TARGET_LANGUAGES or any(code not in TARGET_LANGUAGES for code in selected_langs):
+        log_request(request_id, "request", "rejected", 1, 0.0, 0.0)
+        return "Select valid source and target languages.", 400
+
+    ALLOWED_EXTENSIONS = {".json", ".txt", ".pdf"}
+    source_items = []
+    output_names = set()
+    for file in uploaded_files:
+        filename = secure_filename(file.filename or '')
+        if not filename:
+            log_request(request_id, "request", "rejected", 1, 0.0, 0.0)
+            return "Her dosya için bir dosya adı gerekli.", 400
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            log_request(request_id, "request", "rejected", 1, 0.0, 0.0)
+            return "Yalnızca .json, .txt ve .pdf dosyaları kabul edilir.", 400
+        base_name = os.path.splitext(filename)[0]
+        try:
+            if ext == ".json":
+                try:
+                    source_data = json.load(file)
+                except (ValueError, UnicodeError):
+                    log_request(request_id, "request", "rejected", 1, 0.0, 0.0)
+                    return "A file contains invalid or empty JSON. Correct it and try again.", 400
+                out_ext = ".json"
+                translator = translate_recursive_parallel
+                is_json = True
+            elif ext == ".txt":
+                source_data = file.read().decode("utf-8")
+                out_ext = ".txt"
+                translator = translate_text
+                is_json = False
+            else:
+                reader = PdfReader(io.BytesIO(file.read()))
+                source_data = "\n".join((page.extract_text() or "") for page in reader.pages)
+                out_ext = ".txt"
+                translator = translate_text
+                is_json = False
+        except Exception:
+            log_request(request_id, "request", "rejected", 1, 0.0, 0.0)
+            return "Dosya okunamadı veya geçerli bir metin içermiyor.", 400
+        for code in selected_langs:
+            output_name = f"{base_name}_{code}{out_ext}"
+            if output_name in output_names:
+                log_request(request_id, "request", "rejected", 1, 0.0, 0.0)
+                return "Uploaded files must have distinct names.", 400
+            output_names.add(output_name)
+            source_items.append((output_name, code, source_data, base_name, translator, is_json))
+
+    memory_file = io.BytesIO()
+    try:
+        # Reuse one English intermediate per file for all selected targets in this request.
+        english_sources = {}
+        if source_language != "en" and any(code != source_language for code in selected_langs):
+            for _, _, data, base_name, translator, _ in source_items:
+                if base_name not in english_sources or english_sources[base_name][0] is not data:
+                    english_sources[base_name] = (data, translator(data, "en", source_language, request_id))
+        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as archive:
+            with ThreadPoolExecutor(max_workers=min(len(source_items), 8)) as executor:
+                futures = {
+                    executor.submit(
+                        translator,
+                        english_sources[base_name][1] if code != source_language and base_name in english_sources else data,
+                        code,
+                        "en" if code != source_language and base_name in english_sources else source_language,
+                        request_id,
+                    ): (output_name, is_json)
+                    for output_name, code, data, base_name, translator, is_json in source_items
+                }
+                for future in as_completed(futures):
+                    output_name, is_json = futures[future]
+                    translated_data = future.result()
+                    if is_json:
+                        payload = json.dumps(translated_data, ensure_ascii=False, indent=2).encode('utf-8')
+                    else:
+                        payload = translated_data.encode('utf-8') if isinstance(translated_data, str) else str(translated_data).encode('utf-8')
+                    archive.writestr(output_name, payload)
+    except TransientTranslationError:
+        ADMISSION_GATE.release()
+        log_request(request_id, "request", "failed", 1, 0.0, 0.0)
+        return "Translation service is temporarily unavailable. Automatic retries could not complete; please try again later. No partial archive was saved.", 502
+    except Exception:
+        ADMISSION_GATE.release()
+        # Do not publish partial archives or log user text, credentials, or provider payloads.
+        logger.warning("Translation request failed; archive was not published")
+        log_request(request_id, "request", "failed", 1, 0.0, 0.0)
+        return "Translation failed or returned incomplete text. Check the API configuration, language pair and placeholders, then retry.", 502
+
+    log_request(request_id, "request", "completed", 1, 0.0, 0.0)
     session_id = get_user_session_id()
     user_dir = os.path.join(BASE_OUTPUT_DIR, session_id)
     os.makedirs(user_dir, exist_ok=True)
-
-    try:
-        uploaded_files = request.files.getlist('files')
-        selected_langs = request.form.getlist('languages')
-
-        if not uploaded_files or not selected_langs:
-            return "Please select at least one file and language!", 400
-
-        # Sadece kullanıcının işaretlediği ve sistemde tanımlı olan dilleri seç.
-        # TARGET_LANGUAGES'te olmayan veya formda gelmeyen hiçbir dil çevrilmeyecektir.
-        valid_lang_codes = set(TARGET_LANGUAGES.keys())
-        selected_langs = [code for code in selected_langs if code in valid_lang_codes]
-
-        if not selected_langs:
-            return "Geçerli bir hedef dil seçilmedi!", 400
-
-        # Load all source data from uploaded files first
-        source_items = []
-        for file in uploaded_files:
-            if not file.filename.endswith('.json'):
-                continue
-
-            base_name = os.path.splitext(file.filename)[0]
-            try:
-                file.stream.seek(0)
-                source_data = json.load(file)
-            except Exception:
-                continue
-
-            # Yalnızca seçilen (ve geçerli) dillere çeviri yapılır, tüm dillere değil.
-            for code in selected_langs:
-                lang_name = TARGET_LANGUAGES[code]
-                source_items.append((base_name, code, lang_name, source_data))
-
-        memory_file = io.BytesIO()
-
-        stats = {'failed': 0}
-        lock = threading.Lock()
-
-        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
-            # Translate files × languages concurrently to avoid sequential API timeout
-            max_workers = min(len(source_items), 8)
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                future_to_item = {}
-                for base_name, code, lang_name, source_data in source_items:
-                    future = executor.submit(translate_recursive_parallel, source_data, lang_name, stats, lock)
-                    future_to_item[future] = (base_name, code, source_data)
-
-                for future in as_completed(future_to_item):
-                    base_name, code, source_data = future_to_item[future]
-                    try:
-                        translated_data = future.result()
-                    except Exception:
-                        translated_data = source_data
-
-                    output_filename = f"{base_name}_{code}.json"
-                    json_bytes = json.dumps(translated_data, ensure_ascii=False, indent=2).encode('utf-8')
-                    zf.writestr(output_filename, json_bytes)
-
-        translation_total = stats.get('total', 0)
-        translation_failed = stats.get('failed', 0)
-
-        # Tüm çeviriler başarısız olduysa API'nin çalışmadığından emin ol — kullanıcıyı bilgilendir.
-        if translation_total > 0 and translation_failed == translation_total:
-            logger.error("Tüm %d çeviri işlemi başarısız oldu. NVIDIA NIM API'sine erişim sağlanamıyor olabilir.", translation_total)
-            return "Çeviri hizmetine erişilemiyor. Lütfen NVIDIA API anahtarınızı ve internet bağlantınızı kontrol edip tekrar deneyin.", 502
-
-        memory_file.seek(0)
-
-        timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-        zip_filename = f"ceviri_arsivi_{timestamp_str}.zip"
-        save_path = os.path.join(user_dir, zip_filename)
-
-        with open(save_path, 'wb') as f_out:
-            f_out.write(memory_file.getvalue())
-
-        memory_file.seek(0)
-
-        resp = make_response(send_file(
-            memory_file,
-            mimetype='application/zip',
-            as_attachment=True,
-            download_name=zip_filename
-        ))
-        resp.set_cookie("user_session", session_id)
-        return resp
-
-    except Exception:
-        return "Translation failed. Please try again with fewer files or languages.", 500
+    zip_filename = f"ceviri_arsivi_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.zip"
+    with open(os.path.join(user_dir, zip_filename), 'wb') as output:
+        output.write(memory_file.getvalue())
+    memory_file.seek(0)
+    resp = make_response(send_file(memory_file, mimetype='application/zip', as_attachment=True, download_name=zip_filename))
+    resp.set_cookie("user_session", session_id)
+    return resp
 
 @app.route('/download/<filename>')
 def download_history(filename):
@@ -1351,4 +1551,4 @@ def download_history(filename):
     return "Unauthorized access or file not found!", 403
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=6161, debug=True)
+    app.run(host='0.0.0.0', port=5001)

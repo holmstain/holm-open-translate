@@ -2,6 +2,38 @@
 
 Holm Open Translate is a Flask application for translating JSON localization files with the NVIDIA NIM translation API. Upload one or more JSON files, choose target languages, and download the translated files in a ZIP archive.
 
+## Translation contract and verification
+
+Select the **source language** of the uploaded JSON. It defaults to English; language detection is not automatic. All listed source → target combinations are supported. English → Turkish and Turkish → English use one native provider step; Turkish → German uses Turkish → English → German. The English intermediate is generated once per uploaded file and reused across the selected targets within that request. An identical source/target selection copies the original JSON values without an API call. Two-step translation may increase latency, API usage and translation drift; quality for every pair has not been verified live. The interface language selector changes display text only. Latin American Spanish remains `es-419` in output filenames and maps to NVIDIA's `es-us` code.
+
+The app sends the provider a system message containing the language pair (for example `en-tr`) and a user message containing only the source text, following the [NVIDIA Riva Translate model card](https://huggingface.co/nvidia/riva-translate-4b-instruct-v2). Every nonblank JSON string is translated; keys, lists, numbers, booleans, null and whitespace-only strings are retained. Common brace placeholders (`{name}`, `{{name}}`, `${name}`) and printf placeholders (`%s`, `%d`, `%1$s`, `%(name)s`) are checked for identical spelling and counts. Other localization grammars, including complex ICU message syntax, require separate validation.
+
+Invalid files and unknown source or target languages return HTTP 400. A provider exception, empty/incomplete response, or changed supported placeholder returns HTTP 502; partial archives are not saved or presented as success. The browser sends the request immediately, shows a busy state and starts the ZIP download only after receiving the actual successful response. A download link remains available after completion; refresh to see it in session history. Inputs remain available to retry after an error.
+
+Run offline regressions with the commands below. They replace only the external provider and block socket connections:
+
+```bash
+venv/bin/python -m unittest discover -v
+node test_ui_flow.js
+```
+
+The existing asset/security tests use pytest-style functions. To run the complete Python suite in an environment with pytest installed:
+
+```bash
+python -m pip install pytest
+python -m pytest -q
+```
+
+`test.py` is safe to import and makes no request unless explicitly run with `--live`. That smoke check performs one logical translation of a synthetic `Hello` string to Turkish using the configured key (up to three HTTP attempts under the same retry policy); it prints only a pass/fail status. It does not establish translation quality across all languages.
+
+Local `python app.py` currently listens on port **5001**. Docker/Gunicorn uses container port **5000**; see `docker-compose.yml` for the published port. Requests are synchronous, with up to eight file/language tasks at once and sequential strings within each task. Each HTTP attempt keeps the 30-second SDK timeout (a phase/inactivity timeout, not a hard total request deadline). A logical provider call makes at most three attempts for connection/timeouts or HTTP 429/500/502/503/504, with 0.5 then 1 second backoff. A numeric or HTTP-date `Retry-After` may replace a wait up to 5 seconds; a longer server-directed wait ends the request without retrying early. Thus each call has at most three HTTP attempts and two waits of at most 5 seconds; there is no guaranteed 90/100-second wall-clock bound. Successful strings and completed English pivot steps are retained within the running request and are not repeated by a later string retry. HTTP 400/401/403 (and other non-allowlisted statuses), empty/truncated translations and changed placeholders are not retried. Persistent temporary failures return a distinct HTTP 502 message and publish no partial archive. Nothing is cached across separate requests. The Docker sync worker's default 30-second request timeout can interrupt larger files; this has not been reproduced against a live container. Use small uploads until deployment request limits are verified; no background queue or progress percentage API exists.
+
+## Çeviri sözleşmesi
+
+Geçici bağlantı/zaman aşımı ve HTTP 429/500/502/503/504 hatalarında yalnız başarısız API çağrısı en fazla üç kez denenir. Beklemeler 0,5 ve 1 saniyedir; `Retry-After` en fazla 5 saniye olabilir, daha uzunsa erken yeniden çağırmak yerine işlem durur. Her HTTP denemesinin zaman aşımı 30 saniyedir; bu toplam işlem süresi garantisi değildir. Başarılı metinler aynı istek içinde yeniden çevrilmez. Kimlik doğrulama/geçersiz istek ve bozuk çeviri sonuçları yeniden denenmez; kalıcı hatada kısmi arşiv oluşturulmaz.
+
+JSON dosyasının gerçek **kaynak dilini** seçin (varsayılan İngilizce). Otomatik dil algılama yoktur. Listelenen tüm kaynak → hedef dil çiftleri desteklenir. İngilizce içeren çiftler doğrudan; Türkçe → Almanca gibi çiftler kaynak → İngilizce → hedef olarak iki adımda çevrilir. İngilizce ara JSON her dosya için bir kez üretilip aynı isteğin hedefleri arasında paylaşılır. Aynı kaynak/hedef dili API çağrısı olmadan özgün JSON değerlerini kopyalar. İki adım süreyi, API kullanımını ve anlam kayması olasılığını artırabilir; tüm çiftlerin kalitesi canlı doğrulanmamıştır. Bilinmeyen dil kodları 400 döndürür. Arayüz dili kaynak dilini değiştirmez. Geçersiz JSON 400, eksik/boş/başarısız API yanıtı veya desteklenen yer tutucunun bozulması 502 döndürür; eksik arşiv yayımlanmaz. Gerçek başarılı yanıttan sonra indirme başlar; hata durumunda seçilen dosyalar korunur ve yeniden denenebilir.
+
 ## Languages
 
 [🇬🇧 English](#english) · [🇹🇷 Türkçe](#turkce) · [🇪🇸 Español](#espanol) · [🇵🇱 Polski](#polski) · [🇵🇹 Português](#portugues) · [🇹🇼 繁體中文](#chinese) · [🇯🇵 日本語](#japanese)
@@ -24,7 +56,7 @@ Placeholders in text, such as `{name}`, `%s`, and `%d`, are intended to remain i
 
 - Python 3.10 or later
 - A NVIDIA NIM API key
-- `Flask`, `openai`, and `python-dotenv`
+- `Flask`, `openai`, and `python-dotenv` (Node.js is only needed for the UI handler tests)
 
 ## Setup
 
@@ -69,20 +101,21 @@ Keep `.env` private and do not commit it to source control.
 python app.py
 ```
 
-Open [http://localhost:5000](http://localhost:5000) in your browser.
+Open [http://localhost:5001](http://localhost:5001) in your browser.
 
 ## Run tests
 
 The focused translation-target tests use a mocked translator and do not require API access:
 
 ```bash
-python -m pytest -q test_language_targets.py
+python -m unittest test_translation_flow -v
+node test_ui_flow.js
 ```
 
 The translator test suite includes a live NVIDIA API request. Configure `NVIDIA_API_KEY` before running it:
 
 ```bash
-python -m unittest test_translator.py
+python test.py --live
 ```
 
 ## Project files
@@ -90,8 +123,8 @@ python -m unittest test_translator.py
 | File | Description |
 | --- | --- |
 | `app.py` | Flask application, web interface, and JSON translation workflow |
-| `test_language_targets.py` | Tests for translation targets and ZIP output |
-| `test_translator.py` | Translator, output JSON, and placeholder checks |
+| `test_translation_flow.py` | Tests for translation targets and ZIP output |
+| `test_ui_flow.js` | Offline UI submission, loading, success and error checks (Node.js) |
 | `test.py` | Simple NVIDIA API connectivity check |
 | `.env.example` | Example environment variable configuration |
 
@@ -168,20 +201,21 @@ NVIDIA_API_KEY=your_nvidia_api_key_here
 python app.py
 ```
 
-Tarayıcınızda [http://localhost:5000](http://localhost:5000) adresini açın.
+Tarayıcınızda [http://localhost:5001](http://localhost:5001) adresini açın.
 
 ## Testleri çalıştırma
 
 Odaklı hedef dil testleri taklitçi çeviri kullanır ve API erişimi gerektirmez:
 
 ```bash
-python -m pytest -q test_language_targets.py
+python -m unittest test_translation_flow -v
+node test_ui_flow.js
 ```
 
 Çevirmen test paketi NVIDIA API'sine canlı bir istek gönderir. Çalıştırmadan önce `NVIDIA_API_KEY` değerini yapılandırın:
 
 ```bash
-python -m unittest test_translator.py
+python test.py --live
 ```
 
 ## Proje dosyaları
@@ -189,8 +223,8 @@ python -m unittest test_translator.py
 | Dosya | Açıklama |
 | --- | --- |
 | `app.py` | Flask uygulaması, web arayüzü ve JSON çeviri akışı |
-| `test_language_targets.py` | Çeviri hedefleri ve ZIP çıktısı testleri |
-| `test_translator.py` | Çevirmen, çıktı JSON'u ve yer tutucu kontrolleri |
+| `test_translation_flow.py` | Çeviri hedefleri ve ZIP çıktısı testleri |
+| `test_ui_flow.js` | Offline UI submission, loading, success and error checks (Node.js) |
 | `test.py` | NVIDIA API bağlantı kontrolü |
 | `.env.example` | Örnek ortam değişkeni yapılandırması |
 
@@ -267,20 +301,21 @@ Mantén `.env` privado y no lo incluyas en el control de versiones.
 python app.py
 ```
 
-Abre [http://localhost:5000](http://localhost:5000) en el navegador.
+Abre [http://localhost:5001](http://localhost:5001) en el navegador.
 
 ## Ejecutar las pruebas
 
 Las pruebas específicas de los idiomas utilizan un traductor simulado y no requieren acceso a la API:
 
 ```bash
-python -m pytest -q test_language_targets.py
+python -m unittest test_translation_flow -v
+node test_ui_flow.js
 ```
 
 La suite del traductor realiza una solicitud real a la API de NVIDIA. Configura `NVIDIA_API_KEY` antes de ejecutarla:
 
 ```bash
-python -m unittest test_translator.py
+python test.py --live
 ```
 
 ## Archivos del proyecto
@@ -288,8 +323,8 @@ python -m unittest test_translator.py
 | Archivo | Descripción |
 | --- | --- |
 | `app.py` | Aplicación Flask, interfaz web y flujo de traducción JSON |
-| `test_language_targets.py` | Pruebas de idiomas de destino y archivos ZIP |
-| `test_translator.py` | Pruebas del traductor, JSON de salida y marcadores de posición |
+| `test_translation_flow.py` | Pruebas de idiomas de destino y archivos ZIP |
+| `test_ui_flow.js` | Offline UI submission, loading, success and error checks (Node.js) |
 | `test.py` | Comprobación de conexión con la API de NVIDIA |
 | `.env.example` | Configuración de ejemplo para las variables de entorno |
 
@@ -366,20 +401,21 @@ Nie udostępniaj pliku `.env` ani nie dodawaj go do repozytorium.
 python app.py
 ```
 
-Otwórz w przeglądarce adres [http://localhost:5000](http://localhost:5000).
+Otwórz w przeglądarce adres [http://localhost:5001](http://localhost:5001).
 
 ## Uruchamianie testów
 
 Testy języków docelowych korzystają z translatora zastępczego i nie wymagają dostępu do API:
 
 ```bash
-python -m pytest -q test_language_targets.py
+python -m unittest test_translation_flow -v
+node test_ui_flow.js
 ```
 
 Testy translatora wysyłają rzeczywiste żądanie do API NVIDIA. Przed ich uruchomieniem skonfiguruj `NVIDIA_API_KEY`:
 
 ```bash
-python -m unittest test_translator.py
+python test.py --live
 ```
 
 ## Pliki projektu
@@ -387,8 +423,8 @@ python -m unittest test_translator.py
 | Plik | Opis |
 | --- | --- |
 | `app.py` | Aplikacja Flask, interfejs WWW i proces tłumaczenia JSON |
-| `test_language_targets.py` | Testy języków docelowych i archiwum ZIP |
-| `test_translator.py` | Testy translatora, wyjściowego JSON i symboli zastępczych |
+| `test_translation_flow.py` | Testy języków docelowych i archiwum ZIP |
+| `test_ui_flow.js` | Offline UI submission, loading, success and error checks (Node.js) |
 | `test.py` | Test połączenia z API NVIDIA |
 | `.env.example` | Przykładowa konfiguracja zmiennych środowiskowych |
 
@@ -465,20 +501,21 @@ Mantenha o ficheiro `.env` privado e não o inclua no controlo de versões.
 python app.py
 ```
 
-Abra [http://localhost:5000](http://localhost:5000) no navegador.
+Abra [http://localhost:5001](http://localhost:5001) no navegador.
 
 ## Executar os testes
 
 Os testes específicos dos idiomas utilizam um tradutor simulado e não precisam de acesso à API:
 
 ```bash
-python -m pytest -q test_language_targets.py
+python -m unittest test_translation_flow -v
+node test_ui_flow.js
 ```
 
 A suite do tradutor envia um pedido real à API NVIDIA. Configure `NVIDIA_API_KEY` antes de a executar:
 
 ```bash
-python -m unittest test_translator.py
+python test.py --live
 ```
 
 ## Ficheiros do projeto
@@ -486,8 +523,8 @@ python -m unittest test_translator.py
 | Ficheiro | Descrição |
 | --- | --- |
 | `app.py` | Aplicação Flask, interface Web e fluxo de tradução JSON |
-| `test_language_targets.py` | Testes dos idiomas de destino e do arquivo ZIP |
-| `test_translator.py` | Testes do tradutor, do JSON de saída e dos marcadores de posição |
+| `test_translation_flow.py` | Testes dos idiomas de destino e do arquivo ZIP |
+| `test_ui_flow.js` | Offline UI submission, loading, success and error checks (Node.js) |
 | `test.py` | Verificação da ligação à API NVIDIA |
 | `.env.example` | Configuração de exemplo das variáveis de ambiente |
 
@@ -564,20 +601,21 @@ NVIDIA_API_KEY=your_nvidia_api_key_here
 python app.py
 ```
 
-在瀏覽器中開啟 [http://localhost:5000](http://localhost:5000)。
+在瀏覽器中開啟 [http://localhost:5001](http://localhost:5001)。
 
 ## 執行測試
 
 目標語言測試使用模擬翻譯器，不需要存取 API：
 
 ```bash
-python -m pytest -q test_language_targets.py
+python -m unittest test_translation_flow -v
+node test_ui_flow.js
 ```
 
 翻譯器測試會對 NVIDIA API 發出實際請求。執行前請先設定 `NVIDIA_API_KEY`：
 
 ```bash
-python -m unittest test_translator.py
+python test.py --live
 ```
 
 ## 專案檔案
@@ -585,8 +623,8 @@ python -m unittest test_translator.py
 | 檔案 | 說明 |
 | --- | --- |
 | `app.py` | Flask 應用程式、網頁介面與 JSON 翻譯流程 |
-| `test_language_targets.py` | 目標語言與 ZIP 輸出測試 |
-| `test_translator.py` | 翻譯器、輸出 JSON 與佔位符測試 |
+| `test_translation_flow.py` | 目標語言與 ZIP 輸出測試 |
+| `test_ui_flow.js` | Offline UI submission, loading, success and error checks (Node.js) |
 | `test.py` | NVIDIA API 連線測試 |
 | `.env.example` | 環境變數設定範例 |
 
@@ -663,20 +701,21 @@ NVIDIA_API_KEY=your_nvidia_api_key_here
 python app.py
 ```
 
-ブラウザーで[http://localhost:5000](http://localhost:5000)を開きます。
+ブラウザーで[http://localhost:5001](http://localhost:5001)を開きます。
 
 ## テストの実行
 
 対象言語のテストではモック翻訳器を使用するため、APIアクセスは不要です。
 
 ```bash
-python -m pytest -q test_language_targets.py
+python -m unittest test_translation_flow -v
+node test_ui_flow.js
 ```
 
 翻訳器のテストではNVIDIA APIに実際のリクエストを送信します。実行前に`NVIDIA_API_KEY`を設定してください。
 
 ```bash
-python -m unittest test_translator.py
+python test.py --live
 ```
 
 ## プロジェクトファイル
@@ -684,8 +723,8 @@ python -m unittest test_translator.py
 | ファイル | 説明 |
 | --- | --- |
 | `app.py` | Flaskアプリケーション、Webインターフェース、JSON翻訳処理 |
-| `test_language_targets.py` | 翻訳先言語とZIP出力のテスト |
-| `test_translator.py` | 翻訳器、出力JSON、プレースホルダーのテスト |
+| `test_translation_flow.py` | 翻訳先言語とZIP出力のテスト |
+| `test_ui_flow.js` | Offline UI submission, loading, success and error checks (Node.js) |
 | `test.py` | NVIDIA API接続テスト |
 | `.env.example` | 環境変数設定のサンプル |
 

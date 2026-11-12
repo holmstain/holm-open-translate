@@ -1,20 +1,31 @@
-import os
-from openai import OpenAI
+"""Optional, single-translation NVIDIA smoke check (up to three HTTP attempts); safe to import during discovery."""
+import argparse
 
-API_KEY = os.getenv("NVIDIA_API_KEY")
-BASE_URL = "https://integrate.api.nvidia.com/v1"
-MODEL_NAME = "nvidia/riva-translate-4b-instruct-v2"
 
-client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--live', action='store_true', help='Authorize one short translation (up to three HTTP attempts) using the configured project key')
+    args = parser.parse_args()
+    if not args.live:
+        parser.print_help()
+        return 0
 
-try:
-    print("Testing the API connection...")
-    completion = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[{"role": "user", "content": "Say hello"}],
-        max_tokens=50
-    )
-    print("API Response Successful!")
-    print("Received Response:", completion.choices[0].message.content)
-except Exception as e:
-    print("API Connection Error:", e)
+    from app import API_KEY, translate_text
+    if not API_KEY:
+        print('NVIDIA_API_KEY is not configured.')
+        return 1
+    try:
+        translated = translate_text('Hello', 'tr', 'en')
+        if translated.casefold() == 'hello':
+            print('Live smoke failed: the provider returned the unchanged English source.')
+            return 1
+    except Exception:
+        # Provider exceptions can contain request data; never print them here.
+        print('Live smoke failed. Check API configuration and network access.')
+        return 1
+    print('Live smoke passed: one complete English-to-Turkish translation received.')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
