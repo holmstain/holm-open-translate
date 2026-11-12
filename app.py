@@ -954,11 +954,11 @@ HTML_TEMPLATE = """
                     <span class="visually-hidden" data-i18n="interfaceLanguage">Arayüz dili</span>
                     <select class="language-select" id="interface-language" aria-label="Arayüz dili">
                         <option value="tr">Türkçe</option>
-                        <option value="es">Español</option>
+                        <option value="es-ES">Español</option>
                         <option value="en">English</option>
                         <option value="fr">Français</option>
                         <option value="pl">Polski</option>
-                        <option value="pt">Português</option>
+                        <option value="pt-PT">Português</option>
                         <option value="de">Deutsch</option>
                         <option value="ja">日本語</option>
                         <option value="zh-TW">繁體中文</option>
