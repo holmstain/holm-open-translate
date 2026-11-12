@@ -87,7 +87,6 @@ class AdmissionGate:
             until = now + wait
             if until > self._cooldown_until:
                 self._cooldown_until = until
-            self._emergency_lock = True
             logger.info(
                 "admission_cooldown request_id=%s category=http status=429 attempt=1 wait=%.1f elapsed=0.0 active=%d",
                 request_id, wait, self._active,
@@ -104,6 +103,14 @@ class AdmissionGate:
 
 
 ADMISSION_GATE = AdmissionGate()
+
+# Load UI locale bundles from locales/*.json for template rendering.
+LOCALES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "locales")
+LOCALES = {}
+for _filename in os.listdir(LOCALES_DIR):
+    if _filename.endswith(".json"):
+        with open(os.path.join(LOCALES_DIR, _filename), encoding="utf-8") as _fh:
+            LOCALES[_filename[:-5]] = json.load(_fh)
 
 
 def log_request(request_id, category, status, attempt, wait, elapsed):
@@ -766,14 +773,19 @@ HTML_TEMPLATE = """
             overflow: hidden;
             margin: 10px 0 4px;
             border: 1px solid var(--border);
+            transition: border-color .2s ease, background-color .2s ease;
         }
 
         .progress-bar {
             height: 100%;
             width: 0%;
-            background: linear-gradient(135deg, var(--accent-color), #16A34A);
+            background: linear-gradient(135deg, var(--accent-color), var(--accent-color));
             border-radius: 999px;
-            transition: width .3s ease;
+            transition: width .3s ease, background-color .3s ease;
+        }
+
+        .progress-bar[data-error="true"] {
+            background: linear-gradient(135deg, var(--destructive), var(--destructive));
         }
 
         .progress-label {
@@ -784,6 +796,7 @@ HTML_TEMPLATE = """
             color: var(--card-fg);
             margin-bottom: 2px;
             letter-spacing: .02em;
+            transition: color .2s ease;
         }
 
         .progress-status {
@@ -791,6 +804,7 @@ HTML_TEMPLATE = """
             color: var(--muted-fg);
             margin-bottom: 6px;
             min-height: 14px;
+            transition: color .2s ease;
         }
 
         .progress-wrap {
@@ -802,6 +816,7 @@ HTML_TEMPLATE = """
             background: var(--glass);
             backdrop-filter: blur(12px);
             box-shadow: 0 10px 30px rgba(0,0,0,.15);
+            transition: border-color .2s ease, background-color .2s ease;
         }
 
         .progress-success {
@@ -954,7 +969,7 @@ HTML_TEMPLATE = """
                         <option value="zh-TW">繁體中文</option>
                     </select>
                 </label>
-                <button class="control-pill theme-toggle" id="theme-toggle" type="button" aria-label="Koyu temayı aç" aria-pressed="false">
+                <button class="control-pill theme-toggle" id="theme-toggle" type="button" data-i18n="themeDark" aria-pressed="false">
                     <i class="fa-solid fa-moon" aria-hidden="true"></i>
                     <span class="visually-hidden" id="theme-label">Koyu tema</span>
                 </button>
@@ -982,9 +997,9 @@ HTML_TEMPLATE = """
                     <label class="step-label" for="json-files">
                         <span class="step-number">1</span> <span data-i18n="stepFiles">JSON dosyalarını ekleyin</span>
                     </label>
-                    <input class="form-control file-control" id="json-files" type="file" name="files" multiple accept=".json" aria-describedby="file-hint file-limit-hint" required>
+                    <input class="form-control file-control" id="json-files" type="file" name="files" multiple accept=".json,.txt,.pdf" aria-describedby="file-hint file-limit-hint" required>
                     <p class="field-hint" id="file-hint" data-i18n="fileHint">Bir veya daha fazla .json dosyası seçebilirsiniz.</p>
-                    <p class="field-hint" id="file-limit-hint">En fazla 10 JSON dosyası seçilebilir.</p>
+                    <p class="field-hint" id="file-limit-hint" data-i18n="fileLimitHint">En fazla 10 JSON dosyası seçilebilir.</p>
                 </div>
 
                 <div class="step-block">
@@ -994,14 +1009,14 @@ HTML_TEMPLATE = """
                         <option value="{{ code }}" {% if code == 'en' %}selected{% endif %}>{{ name }} ({{ code }})</option>
                         {% endfor %}
                     </select>
-                    <p class="field-hint" id="source-hint" data-i18n="sourceHint">Dosyanın gerçek dilini seçin. Tüm listelenen dil çiftleri desteklenir. İngilizce dışındaki çiftler İngilizce üzerinden iki adımda çevrilir; süre ve API kullanımı artabilir. Otomatik dil algılama yoktur.</p>
+                    <p class="field-hint" id="source-hint" data-i18n="sourceHint">Dosyanın gerçek dilini seçin. Tüm listelenen dil çiftleri desteklenir. İngilizce dışındaki çiftler İngilizce üzerinden iki adımda çevrilir; süre ve API kullanımı artabilir.</p>
                 </div>
 
                 <fieldset class="step-block border-0 p-0">
                     <legend class="step-label">
                         <span class="step-number">2</span> <span data-i18n="stepLanguages">Hedef dilleri seçin</span>
                     </legend>
-                    <p class="field-hint" id="language-limit-hint">En fazla 8 hedef dil seçilebilir.</p>
+                    <p class="field-hint" id="language-limit-hint" data-i18n="languageLimitHint">En fazla 8 hedef dil seçilebilir.</p>
                     <div class="row g-1 language-grid">
                         {% for code, name in languages.items() %}
                         <div class="col-6 col-sm-4">
@@ -1014,14 +1029,14 @@ HTML_TEMPLATE = """
                     </div>
                 </fieldset>
 
-                <div class="progress-wrap" id="progress-wrap" role="alert" aria-live="polite" tabindex="-1">
+                <div class="progress-wrap" id="progress-wrap" role="status" aria-live="polite" tabindex="-1">
                     <div class="progress-status" id="progress-status" data-i18n="progressPreparing">Dosya hazırlanıyor…</div>
                     <div class="progress-label">
                         <span id="progress-label" data-i18n="progressUpload">Yükleniyor</span>
                         <span id="progress-percent">0%</span>
                     </div>
                     <div class="progress-container">
-                        <div class="progress-bar" id="progress-bar"></div>
+                        <div class="progress-bar" id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
                     <div class="progress-success" id="progress-success" style="display:none; align-items:center; gap:10px;">
                         <i class="fa-solid fa-check-circle" aria-hidden="true" style="color:var(--accent-color); font-size:18px;"></i>
@@ -1078,186 +1093,7 @@ HTML_TEMPLATE = """
         </section>
     </main>
     <script>
-        const translations = {
-            tr: {
-                pageTitle: "Holm Open Translate — JSON çeviri çalışma alanı",
-                interfaceLanguage: "Arayüz dili", themeDark: "Koyu temayı aç", themeLight: "Açık temayı aç",
-                privacy: "Kişisel çalışma alanı", eyebrow: "JSON yerelleştirme",
-                headline: "Uygulamanızda Dil bariyerlerini ortadan kaldırın.",
-                intro: "JSON dosyalarınızı seçin, hedef dilleri belirleyin. Çeviri arşiviniz hazır olduğunda indirin.",
-                newTranslation: "Yeni çeviri oluştur", startHint: "Başlamak için dosyalarınızı ve dilleri seçin.",
-                stepFiles: "JSON dosyalarını ekleyin", fileHint: "Bir veya daha fazla .json dosyası seçebilirsiniz.",
-                stepLanguages: "Hedef dilleri seçin", submit: "Çeviriyi başlat ve arşivi indir",
-                recent: "Son çeviriler", recentHint: "Bu oturuma ait arşivleriniz.",
-                archive: "Arşiv adı", date: "Tarih", action: "İşlem", download: "İndir",
-                emptyHistory: "Bu oturuma ait bir arşiv henüz yok.<br>İlk çeviriniz tamamlandığında burada görünecek.",
-                progressPreparing: "Dosya hazırlanıyor…",
-                progressUpload: "Yükleniyor",
-                progressTranslating: "Çeviriliyor…",
-                progressFinishing: "Arşivi hazırlıyor…",
-                progressDone: "Çeviri işlemi başarıyla tamamlandı",
-                targets: { en: "İngilizce", ar: "Arapça", de: "Almanca", es: "İspanyolca", fr: "Fransızca", ja: "Japonca", ko: "Korece", nl: "Felemenkçe", pl: "Lehçe", pt: "Portekizce", zh: "Çince", "zh-TW": "Geleneksel Çince", tr: "Türkçe", it: "İtalyanca", ru: "Rusça" }
-            },
-            en: {
-                pageTitle: "Holm Open Translate — JSON translation workspace",
-                interfaceLanguage: "Interface language", themeDark: "Switch to dark mode", themeLight: "Switch to light mode",
-                privacy: "Private workspace", eyebrow: "JSON localization",
-                headline: "Break down language barriers in your app.",
-                intro: "Choose your JSON files and target languages. Download your translation archive when it is ready.",
-                newTranslation: "Create a translation", startHint: "Choose your files and languages to get started.",
-                stepFiles: "Add JSON files", fileHint: "You can select one or more .json files.",
-                stepLanguages: "Choose target languages", submit: "Translate and download archive",
-                recent: "Recent translations", recentHint: "Your archives from this session.",
-                archive: "Archive", date: "Date", action: "Action", download: "Download",
-                emptyHistory: "There are no archives in this session yet.<br>Your first translation will appear here.",
-                progressPreparing: "Preparing files…",
-                progressUpload: "Uploading",
-                progressTranslating: "Translating…",
-                progressFinishing: "Preparing archive…",
-                progressDone: "Translation completed successfully",
-                targets: { en: "English", ar: "Arabic", de: "German", es: "Spanish", fr: "French", ja: "Japanese", ko: "Korean", nl: "Dutch", pl: "Polish", pt: "Portuguese", zh: "Chinese", "zh-TW": "Traditional Chinese", tr: "Turkish", it: "Italian", ru: "Russian" }
-            },
-            de: {
-                pageTitle: "Holm OpenTranslate — JSON-Übersetzungsbereich",
-                interfaceLanguage: "Oberflächensprache", themeDark: "Dunkelmodus aktivieren", themeLight: "Hellmodus aktivieren",
-                privacy: "Privater Arbeitsbereich", eyebrow: "JSON-Lokalisierung",
-                headline: "Sprachbarrieren in Ihrer App überwinden.",
-                intro: "Wählen Sie Ihre JSON-Dateien und Zielsprachen aus. Laden Sie das Übersetzungsarchiv herunter, sobald es fertig ist.",
-                newTranslation: "Übersetzung erstellen", startHint: "Wählen Sie Dateien und Sprachen, um zu beginnen.",
-                stepFiles: "JSON-Dateien hinzufügen", fileHint: "Sie können eine oder mehrere .json-Dateien auswählen.",
-                stepLanguages: "Zielsprachen auswählen", submit: "Übersetzen und Archiv herunterladen",
-                recent: "Letzte Übersetzungen", recentHint: "Ihre Archive aus dieser Sitzung.",
-                archive: "Archiv", date: "Datum", action: "Aktion", download: "Herunterladen",
-                emptyHistory: "In dieser Sitzung gibt es noch keine Archive.<br>Ihre erste Übersetzung wird hier angezeigt.",
-                progressPreparing: "Dateien werden vorbereitet…",
-                progressUpload: "Hochladen",
-                progressTranslating: "Übersetzung…",
-                progressFinishing: "Archiv wird vorbereitet…",
-                progressDone: "Übersetzung erfolgreich abgeschlossen",
-                targets: { en: "Englisch", ar: "Arabisch", de: "Deutsch", es: "Spanisch", fr: "Französisch", ja: "Japanisch", ko: "Koreanisch", nl: "Niederländisch", pl: "Polnisch", pt: "Portugiesisch", zh: "Chinesisch", "zh-TW": "Traditionelles Chinesisch", tr: "Türkisch", it: "Italienisch", ru: "Russisch" }
-            },
-            fr: {
-                pageTitle: "Holm Open Translate — espace de traduction JSON",
-                interfaceLanguage: "Langue de l’interface", themeDark: "Activer le thème sombre", themeLight: "Activer le thème clair",
-                privacy: "Espace de travail privé", eyebrow: "Localisation JSON",
-                headline: "Brisez les barrières linguistiques dans votre application.",
-                intro: "Choisissez vos fichiers JSON et les langues cibles. Téléchargez votre archive de traduction lorsqu’elle est prête.",
-                newTranslation: "Créer une traduction", startHint: "Choisissez vos fichiers et vos langues pour commencer.",
-                stepFiles: "Ajouter des fichiers JSON", fileHint: "Vous pouvez sélectionner un ou plusieurs fichiers .json.",
-                stepLanguages: "Choisir les langues cibles", submit: "Traduire et télécharger l’archive",
-                recent: "Traductions récentes", recentHint: "Vos archives de cette session.",
-                archive: "Archive", date: "Date", action: "Action", download: "Télécharger",
-                emptyHistory: "Aucune archive pour cette session pour le moment.<br>Votre première traduction apparaîtra ici.",
-                progressPreparing: "Préparation des fichiers…",
-                progressUpload: "Envoi",
-                progressTranslating: "Traduction…",
-                progressFinishing: "Préparation de l'archive…",
-                progressDone: "Traduction terminée avec succès",
-                targets: { en: "Anglais", ar: "Arabe", de: "Allemand", es: "Espagnol", fr: "Français", ja: "Japonais", ko: "Coréen", nl: "Néerlandais", pl: "Polonais", pt: "Portugais", zh: "Chinois", "zh-TW": "Chinois traditionnel", tr: "Turc", it: "Italien", ru: "Russe" }
-            },
-            es: {
-                pageTitle: "Holm Open Translate — espacio de traducción JSON",
-                interfaceLanguage: "Idioma de la interfaz", themeDark: "Activar modo oscuro", themeLight: "Activar modo claro",
-                privacy: "Espacio de trabajo privado", eyebrow: "Localización JSON",
-                headline: "Derriba las barreras del idioma en tu aplicación.",
-                intro: "Elige tus archivos JSON y los idiomas de destino. Descarga el archivo de traducción cuando esté listo.",
-                newTranslation: "Crear una traducción", startHint: "Elige tus archivos e idiomas para comenzar.",
-                stepFiles: "Añadir archivos JSON", fileHint: "Puedes seleccionar uno o varios archivos .json.",
-                stepLanguages: "Elegir idiomas de destino", submit: "Traducir y descargar el archivo",
-                recent: "Traducciones recientes", recentHint: "Tus archivos de esta sesión.",
-                archive: "Archivo", date: "Fecha", action: "Acción", download: "Descargar",
-                emptyHistory: "Aún no hay archivos en esta sesión.<br>Tu primera traducción aparecerá aquí.",
-                progressPreparing: "Preparando archivos…",
-                progressUpload: "Subiendo",
-                progressTranslating: "Traduciendo…",
-                progressFinishing: "Preparando archivo…",
-                progressDone: "Traducción completada con éxito",
-                targets: { en: "Inglés", ar: "Árabe", de: "Alemán", es: "Español", fr: "Francés", ja: "Japonés", ko: "Coreano", nl: "Neerlandés", pl: "Polaco", pt: "Portugués", zh: "Chino", "zh-TW": "Chino tradicional", tr: "Turco", it: "Italiano", ru: "Ruso" }
-            },
-            pl: {
-                pageTitle: "Holm Open Translate — przestrzeń tłumaczeń JSON",
-                interfaceLanguage: "Język interfejsu", themeDark: "Włącz ciemny motyw", themeLight: "Włącz jasny motyw",
-                privacy: "Prywatna przestrzeń robocza", eyebrow: "Lokalizacja JSON",
-                headline: "Pokonaj bariery językowe w swojej aplikacji.",
-                intro: "Wybierz pliki JSON i języki docelowe. Pobierz archiwum tłumaczeń, gdy będzie gotowe.",
-                newTranslation: "Utwórz tłumaczenie", startHint: "Wybierz pliki i języki, aby rozpocząć.",
-                stepFiles: "Dodaj pliki JSON", fileHint: "Możesz wybrać jeden lub więcej plików .json.",
-                stepLanguages: "Wybierz języki docelowe", submit: "Przetłumacz i pobierz archiwum",
-                recent: "Ostatnie tłumaczenia", recentHint: "Archiwa z tej sesji.",
-                archive: "Archiwum", date: "Data", action: "Akcja", download: "Pobierz",
-                emptyHistory: "W tej sesji nie ma jeszcze archiwów.<br>Pierwsze tłumaczenie pojawi się tutaj.",
-                progressPreparing: "Przygotowywanie plików…",
-                progressUpload: "Wgrywanie",
-                progressTranslating: "Tłumaczenie…",
-                progressFinishing: "Przygotowywanie archiwum…",
-                targets: { en: "Angielski", ar: "Arabski", de: "Niemiecki", es: "Hiszpański", fr: "Francuski", ja: "Japoński", ko: "Koreański", nl: "Niderlandzki", pl: "Polski", pt: "Portugalski", zh: "Chiński", "zh-TW": "Chiński tradycyjny", tr: "Turecki", it: "Włoski", ru: "Rosyjski" }
-            },
-            pt: {
-                pageTitle: "Holm Open Translate — espaço de tradução JSON",
-                interfaceLanguage: "Idioma da interface", themeDark: "Ativar modo escuro", themeLight: "Ativar modo claro",
-                privacy: "Espaço de trabalho privado", eyebrow: "Localização JSON",
-                headline: "Quebre as barreiras linguísticas em sua aplicação.",
-                intro: "Escolha seus arquivos JSON e os idiomas de destino. Baixe o arquivo de tradução quando estiver pronto.",
-                newTranslation: "Criar tradução", startHint: "Escolha seus arquivos e idiomas para começar.",
-                stepFiles: "Adicionar arquivos JSON", fileHint: "Você pode selecionar um ou mais arquivos .json.",
-                stepLanguages: "Escolher idiomas de destino", submit: "Traduzir e baixar arquivo",
-                recent: "Traduções recentes", recentHint: "Seus arquivos desta sessão.",
-                archive: "Arquivo", date: "Data", action: "Ação", download: "Baixar",
-                emptyHistory: "Ainda não há arquivos nesta sessão.<br>Sua primeira tradução aparecerá aqui.",
-                progressPreparing: "Preparando arquivos…",
-                progressUpload: "Enviando",
-                progressTranslating: "Traduzindo…",
-                progressFinishing: "Preparando arquivo…",
-                targets: { en: "Inglês", ar: "Árabe", de: "Alemão", es: "Espanhol", fr: "Francês", ja: "Japonês", ko: "Coreano", nl: "Holandês", pl: "Polonês", pt: "Português", zh: "Chinês", "zh-TW": "Chinês tradicional", tr: "Turco", it: "Italiano", ru: "Russo" }
-            },
-            ja: {
-                pageTitle: "Holm Open Translate — JSON翻訳ワークスペース",
-                interfaceLanguage: "表示言語", themeDark: "ダークモードに切り替え", themeLight: "ライトモードに切り替え",
-                privacy: "プライベートワークスペース", eyebrow: "JSONローカライズ",
-                headline: "アプリにおける言語の壁を取り払っていきましょう、",
-                intro: "JSONファイルと翻訳先の言語を選択してください。翻訳アーカイブの準備ができたらダウンロードできます。",
-                newTranslation: "翻訳を作成", startHint: "ファイルと言語を選択して開始します。",
-                stepFiles: "JSONファイルを追加", fileHint: "1つ以上の.jsonファイルを選択できます。",
-                stepLanguages: "翻訳先の言語を選択", submit: "翻訳してアーカイブをダウンロード",
-                recent: "最近の翻訳", recentHint: "このセッションのアーカイブ",
-                archive: "アーカイブ", date: "日付", action: "操作", download: "ダウンロード",
-                emptyHistory: "このセッションにはまだアーカイブがありません。<br>最初の翻訳が完了すると、ここに表示されます。",
-                progressPreparing: "ファイルを準備しています…",
-                progressUpload: "アップロード中",
-                progressTranslating: "翻訳中…",
-                progressFinishing: "アーカイブを準備中…",
-                targets: { en: "英語", ar: "アラビア語", de: "ドイツ語", es: "スペイン語", fr: "フランス語", ja: "日本語", ko: "韓国語", nl: "オランダ語", pl: "ポーランド語", pt: "ポルトガル語", zh: "中国語", "zh-TW": "繁体字中国語", tr: "トルコ語", it: "イタリア語", ru: "ロシア語" }
-            },
-            "zh-TW": {
-                pageTitle: "Holm Open Translate — JSON 翻譯工作區",
-                interfaceLanguage: "介面語言", themeDark: "切換為深色模式", themeLight: "切換為淺色模式",
-                privacy: "私人工作區", eyebrow: "JSON 在地化",
-                headline: "跨越語言隔閡。在您的應用程式中。",
-                intro: "選擇 JSON 檔案和目標語言。翻譯封存檔準備完成後即可下載。",
-                newTranslation: "建立翻譯", startHint: "選擇檔案和語言以開始。",
-                stepFiles: "新增 JSON 檔案", fileHint: "可選擇一個或多個 .json 檔案。",
-                stepLanguages: "選擇目標語言", submit: "開始翻譯並下載封存檔",
-                recent: "最近的翻譯", recentHint: "此工作階段的封存檔。",
-                archive: "封存檔", date: "日期", action: "操作", download: "下載",
-                emptyHistory: "此工作階段目前沒有封存檔。<br>完成第一次翻譯後，檔案會顯示在這裡。",
-                progressPreparing: "正在準備檔案…",
-                progressUpload: "上傳中",
-                progressTranslating: "正在翻譯…",
-                progressFinishing: "正在準備封存檔…",
-                targets: { en: "英文", ar: "阿拉伯文", de: "德文", es: "西班牙文", fr: "法文", ja: "日文", ko: "韓文", nl: "荷蘭文", pl: "波蘭文", pt: "葡萄牙文", zh: "簡體中文", "zh-TW": "繁體中文", tr: "土耳其文", it: "義大利文", ru: "俄文" }
-            }
-        };
-
-        Object.assign(translations.tr, {
-            sourceLanguage: "Kaynak dil", sourceHint: "Dosyanın gerçek dilini seçin. Tüm listelenen dil çiftleri desteklenir. İngilizce dışındaki çiftler İngilizce üzerinden iki adımda çevrilir; süre ve API kullanımı artabilir. Otomatik dil algılama yoktur.",
-            progressWaiting: "Çeviri sürüyor. Dosya boyutuna göre birkaç dakika sürebilir; bu sayfayı açık tutun.",
-            progressError: "Çeviri tamamlanamadı. Bağlantınızı kontrol edip yeniden deneyin."
-        });
-        Object.assign(translations.en, {
-            sourceLanguage: "Source language", sourceHint: "Select the actual file language. All listed language pairs are supported. Pairs without English translate through English in two steps, which may increase time and API use. Language detection is not automatic.",
-            progressWaiting: "Translation in progress. Large files may take several minutes; keep this page open.",
-            progressError: "Translation could not finish. Check your connection and try again."
-        });
+        const translations = {{ locales | tojson | safe }};
 
         const languageSelect = document.getElementById("interface-language");
         const themeToggle = document.getElementById("theme-toggle");
@@ -1346,23 +1182,51 @@ HTML_TEMPLATE = """
                 const copy = translations[languageSelect.value] || translations.tr;
                 const originalLabel = btn.innerHTML;
                 const formData = new FormData(form);
+                const fileInput = document.getElementById("json-files");
+                const fileCount = Math.max(1, (fileInput && fileInput.files ? fileInput.files.length : 1));
+                const langCount = Math.max(1, form.querySelectorAll('input[name="languages"]:checked').length);
+                const totalTasks = fileCount * langCount;
+                const msPerTask = 3000;
+                const totalMs = totalTasks * msPerTask;
+                const startTime = Date.now();
+                let animationFrame;
+                let completed = false;
                 btn.disabled = true;
                 form.setAttribute("aria-busy", "true");
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>';
                 wrap.style.display = "block";
                 success.style.display = "none";
+                bar.style.display = "block";
+                bar.removeAttribute("data-error");
                 status.style.display = "block";
                 status.textContent = copy.progressWaiting || translations.en.progressWaiting;
                 status.setAttribute("role", "status");
                 label.textContent = copy.progressTranslating;
-                pct.textContent = "";
-                bar.style.display = "none";
+                pct.textContent = "0%";
+                bar.style.width = "0%";
+                bar.setAttribute("aria-valuenow", "0");
+                function updateProgress() {
+                    if (completed) return;
+                    const elapsed = Date.now() - startTime;
+                    let pctValue = Math.min(100, Math.round((elapsed / totalMs) * 100));
+                    bar.style.width = pctValue + "%";
+                    bar.setAttribute("aria-valuenow", String(pctValue));
+                    pct.textContent = pctValue + "%";
+                    if (pctValue < 100) {
+                        animationFrame = requestAnimationFrame(updateProgress);
+                    }
+                }
+                animationFrame = requestAnimationFrame(updateProgress);
                 try {
                     const response = await fetch(form.action, { method: "POST", body: formData });
                     if (!response.ok) throw new Error(await response.text());
                     if (!(response.headers.get("Content-Type") || "").includes("application/zip")) {
                         throw new Error(copy.progressError || translations.en.progressError);
                     }
+                    completed = true;
+                    bar.style.width = "100%";
+                    bar.setAttribute("aria-valuenow", "100");
+                    pct.textContent = "100%";
                     const blob = await response.blob();
                     const disposition = response.headers.get("Content-Disposition") || "";
                     const match = disposition.match(/filename="?([^";]+)"?/);
@@ -1384,6 +1248,11 @@ HTML_TEMPLATE = """
                     label.textContent = "";
                     success.style.display = "flex";
                 } catch (error) {
+                    completed = true;
+                    bar.style.width = "100%";
+                    bar.setAttribute("aria-valuenow", "100");
+                    pct.textContent = "100%";
+                    bar.setAttribute("data-error", "true");
                     label.textContent = "";
                     status.setAttribute("role", "alert");
                     status.textContent = error.message || copy.progressError || translations.en.progressError;
@@ -1395,7 +1264,9 @@ HTML_TEMPLATE = """
                 }
             });
         })();
-    </script>
+        <footer class="site-footer">
+                 <p class="site-footer-text text-center small" data-i18n="footerText">© 2026 Holm Open Translate v. 0.1.61 MIT License</p>
+        </footer>
 </body>
 </html>
 """
@@ -1419,7 +1290,7 @@ def index():
                 date_str = datetime.fromtimestamp(timestamp).strftime('%d.%m.%Y %H:%M:%S')
                 history.append({"filename": f, "date": date_str})
 
-    resp = make_response(render_template_string(HTML_TEMPLATE, languages=TARGET_LANGUAGES, history=history))
+    resp = make_response(render_template_string(HTML_TEMPLATE, languages=TARGET_LANGUAGES, history=history, locales=LOCALES))
     resp.set_cookie("user_session", session_id)
     return resp
 
@@ -1517,11 +1388,9 @@ def translate():
                         payload = translated_data.encode('utf-8') if isinstance(translated_data, str) else str(translated_data).encode('utf-8')
                     archive.writestr(output_name, payload)
     except TransientTranslationError:
-        ADMISSION_GATE.release()
         log_request(request_id, "request", "failed", 1, 0.0, 0.0)
         return "Translation service is temporarily unavailable. Automatic retries could not complete; please try again later. No partial archive was saved.", 502
     except Exception:
-        ADMISSION_GATE.release()
         # Do not publish partial archives or log user text, credentials, or provider payloads.
         logger.warning("Translation request failed; archive was not published")
         log_request(request_id, "request", "failed", 1, 0.0, 0.0)
